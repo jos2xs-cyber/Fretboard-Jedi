@@ -1,5 +1,14 @@
 import { NOTES, SCALES, CHORDS, STRING_TUNING_INDICES } from '../constants';
-import { FretboardNote, ScaleType, ChordType, NoteName, Position, Mode } from '../types';
+import {
+  FretboardNote,
+  ScaleType,
+  ChordType,
+  NoteName,
+  Position,
+  Mode,
+  ProgressionScaleSuggestions,
+  SoloScaleSuggestion,
+} from '../types';
 
 export interface ScaleDegreeInfo {
   degree: number;
@@ -274,4 +283,124 @@ export const getTabContent = (
     lines.forEach(line => line.push('|'));
 
     return lines.map(line => line.join('')).join('\n');
+};
+
+const getScaleName = (
+  root: NoteName,
+  kind: 'major' | 'naturalMinor' | 'majorPent' | 'minorPent' | 'mixolydian'
+): string => {
+  if (kind === 'major') return `${root} Major`;
+  if (kind === 'naturalMinor') return `${root} Natural Minor`;
+  if (kind === 'majorPent') return `${root} Major Pentatonic`;
+  if (kind === 'minorPent') return `${root} Minor Pentatonic`;
+  return `${root} Mixolydian`;
+};
+
+const getRelativeMinor = (majorKey: NoteName): NoteName => {
+  const majorIdx = getNoteIndex(majorKey);
+  return NOTES[(majorIdx + 9) % 12];
+};
+
+const getChordSuffix = (chordType: ChordType): string => {
+  if (chordType === ChordType.MAJOR) return '';
+  if (chordType === ChordType.MINOR) return 'm';
+  if (chordType === ChordType.DOMINANT_7) return '7';
+  if (chordType === ChordType.MAJOR_7) return 'maj7';
+  if (chordType === ChordType.MINOR_7) return 'm7';
+  if (chordType === ChordType.MINOR_7_FLAT_5) return 'm7b5';
+  return 'dim';
+};
+
+export const getChordDisplayLabel = (root: NoteName, chordType: ChordType): string => {
+  return `${root}${getChordSuffix(chordType)}`;
+};
+
+const getChordScaleSuggestions = (
+  progressionKey: NoteName,
+  chordRoot: NoteName,
+  chordType: ChordType
+): SoloScaleSuggestion[] => {
+  if (chordType === ChordType.MAJOR || chordType === ChordType.MAJOR_7) {
+    return [
+      {
+        name: getScaleName(chordRoot, 'majorPent'),
+        why: 'Strong chord-tone targeting with simple phrasing.',
+        priority: 'primary',
+      },
+      {
+        name: getScaleName(progressionKey, 'major'),
+        why: 'Stays fully inside the progression key.',
+        priority: 'secondary',
+      },
+    ];
+  }
+
+  if (chordType === ChordType.MINOR || chordType === ChordType.MINOR_7) {
+    return [
+      {
+        name: getScaleName(chordRoot, 'minorPent'),
+        why: 'Easy melodic vocabulary that highlights the minor color.',
+        priority: 'primary',
+      },
+      {
+        name: getScaleName(progressionKey, 'major'),
+        why: 'Connects smoothly back to the full key center.',
+        priority: 'secondary',
+      },
+    ];
+  }
+
+  if (chordType === ChordType.DOMINANT_7) {
+    return [
+      {
+        name: getScaleName(chordRoot, 'mixolydian'),
+        why: 'Best practical match for dominant 7 function.',
+        priority: 'primary',
+      },
+      {
+        name: getScaleName(chordRoot, 'majorPent'),
+        why: 'Safe fallback for melodic lines over V7.',
+        priority: 'secondary',
+      },
+    ];
+  }
+
+  return [
+    {
+      name: getScaleName(progressionKey, 'major'),
+      why: 'Use key tones first; treat chord tones as passing tension.',
+      priority: 'primary',
+    },
+    {
+      name: getScaleName(chordRoot, 'minorPent'),
+      why: 'Optional blues color if phrased lightly.',
+      priority: 'secondary',
+    },
+  ];
+};
+
+export const getProgressionScaleSuggestions = (
+  progressionKey: NoteName,
+  chords: Array<{ root: NoteName; chordType: ChordType }>
+): ProgressionScaleSuggestions => {
+  const relativeMinor = getRelativeMinor(progressionKey);
+
+  return {
+    global: [
+      {
+        name: getScaleName(progressionKey, 'major'),
+        why: 'Primary all-purpose scale for these major-key presets.',
+        priority: 'primary',
+      },
+      {
+        name: getScaleName(progressionKey, 'majorPent'),
+        why: `Safe melodic option (relative: ${getScaleName(relativeMinor, 'minorPent')}).`,
+        priority: 'secondary',
+      },
+    ],
+    perChord: chords.map((chord) => ({
+      chordLabel: getChordDisplayLabel(chord.root, chord.chordType),
+      scales: getChordScaleSuggestions(progressionKey, chord.root, chord.chordType),
+    })),
+  };
 };

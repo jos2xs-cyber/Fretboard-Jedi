@@ -55,6 +55,22 @@ export interface TabConfig {
   direction: 'Ascending' | 'Descending' | 'Up & Down';
 }
 
+export interface SoloScaleSuggestion {
+  name: string;
+  why: string;
+  priority: 'primary' | 'secondary';
+}
+
+export interface ChordScaleSuggestion {
+  chordLabel: string;
+  scales: SoloScaleSuggestion[];
+}
+
+export interface ProgressionScaleSuggestions {
+  global: SoloScaleSuggestion[];
+  perChord: ChordScaleSuggestion[];
+}
+
 export interface Settings {
   showNoteNames: boolean;
   showPositionLabels: boolean;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Guitar, Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle } from 'lucide-react';
 import clsx from 'clsx';
 import Fretboard from './components/Fretboard';
@@ -7,7 +7,7 @@ import VerticalChordChart from './components/VerticalChordChart';
 import TriadFretboard from './components/TriadFretboard';
 import { NOTES, SCALES, CHORDS, POSITION_NAMES, POSITION_COLORS } from './constants';
 import { NoteName, ScaleType, ChordType, Position, Settings, Mode, TriadQuality, StringGroup } from './types';
-import { getScaleNotes, getScaleDegreeChords } from './utils/musicLogic';
+import { getScaleNotes, getScaleDegreeChords, getProgressionScaleSuggestions } from './utils/musicLogic';
 
 interface SelectedChord {
   id: number;
@@ -69,6 +69,7 @@ export default function App() {
   const [isInfoExpanded, setIsInfoExpanded] = useState(true);
   const [showScaleDegreeHelper, setShowScaleDegreeHelper] = useState(true);
   const [progressionKey, setProgressionKey] = useState<NoteName>('A');
+  const [activeProgressionPresetId, setActiveProgressionPresetId] = useState<string | null>(null);
 
   // Ref for Fretboard export
   const fretboardRef = React.useRef<HTMLDivElement>(null);
@@ -102,14 +103,25 @@ export default function App() {
     : `${POSITION_NAMES[position]} (${position})`;
   const selectedScaleNotes = getScaleNotes(root, scaleType);
   const selectedScaleDegreeChords = getScaleDegreeChords(root, scaleType);
+  const activeProgressionPreset = CHORD_PROGRESSIONS.find((preset) => preset.id === activeProgressionPresetId) ?? null;
+  const progressionSuggestions = useMemo(
+    () =>
+      getProgressionScaleSuggestions(
+        progressionKey,
+        selectedChords.map((chord) => ({ root: chord.root, chordType: chord.chordType }))
+      ),
+    [progressionKey, selectedChords]
+  );
 
   const updateChordSelection = (id: number, field: 'root' | 'chordType', value: NoteName | ChordType) => {
+    setActiveProgressionPresetId(null);
     setSelectedChords(prev =>
       prev.map(chord => (chord.id === id ? { ...chord, [field]: value } : chord))
     );
   };
 
   const addChordSelection = () => {
+    setActiveProgressionPresetId(null);
     setSelectedChords(prev => {
       if (prev.length >= 4) return prev;
       const nextId = prev.length ? Math.max(...prev.map(ch => ch.id)) + 1 : 1;
@@ -118,6 +130,7 @@ export default function App() {
   };
 
   const removeChordSelection = (id: number) => {
+    setActiveProgressionPresetId(null);
     setSelectedChords(prev => (prev.length > 1 ? prev.filter(chord => chord.id !== id) : prev));
   };
 
@@ -136,6 +149,7 @@ export default function App() {
     });
 
     setSelectedChords(nextChords);
+    setActiveProgressionPresetId(preset.id);
   };
 
   return (
@@ -229,83 +243,137 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                      Progression Presets
-                    </label>
-                    <div className="relative w-[130px]">
-                      <select
-                        value={progressionKey}
-                        onChange={(e) => setProgressionKey(e.target.value as NoteName)}
-                        className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-1.5 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
-                      >
-                        {NOTES.map(note => <option key={note} value={note}>{note} major</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {CHORD_PROGRESSIONS.map((preset) => (
-                      <button
-                        key={preset.id}
-                        onClick={() => applyProgressionPreset(preset)}
-                        className="px-3 py-1.5 rounded-md text-xs font-semibold border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
-                        title={`Apply ${preset.label} in ${progressionKey} major`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {selectedChords.map((chord, index) => (
-                    <div key={chord.id} className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                          Chord {index + 1}
-                        </span>
-                        <button
-                          onClick={() => removeChordSelection(chord.id)}
-                          disabled={selectedChords.length === 1}
-                          className={clsx(
-                            "text-xs px-2 py-1 rounded border transition-colors",
-                            selectedChords.length === 1
-                              ? "border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed"
-                              : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          )}
-                        >
-                          Remove
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-[110px_1fr] gap-2">
-                        <div className="relative">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-3 items-start">
+                  <div className="space-y-3">
+                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                          Progression Presets
+                        </label>
+                        <div className="relative w-[130px]">
                           <select
-                            value={chord.root}
-                            onChange={(e) => updateChordSelection(chord.id, 'root', e.target.value as NoteName)}
-                            className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-2 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
+                            value={progressionKey}
+                            onChange={(e) => setProgressionKey(e.target.value as NoteName)}
+                            className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-1.5 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
                           >
-                            {NOTES.map(note => <option key={note} value={note}>{note}</option>)}
-                          </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        </div>
-
-                        <div className="relative">
-                          <select
-                            value={chord.chordType}
-                            onChange={(e) => updateChordSelection(chord.id, 'chordType', e.target.value as ChordType)}
-                            className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-2 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
-                          >
-                            {Object.values(ChordType).map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                            {NOTES.map(note => <option key={note} value={note}>{note} major</option>)}
                           </select>
                           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>
                       </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {CHORD_PROGRESSIONS.map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => applyProgressionPreset(preset)}
+                            className={clsx(
+                              "px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors",
+                              activeProgressionPresetId === preset.id
+                                ? "border-violet-500 bg-violet-500 text-white"
+                                : "border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                            )}
+                            title={`Apply ${preset.label} in ${progressionKey} major`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedChords.map((chord, index) => (
+                        <div key={chord.id} className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                              Chord {index + 1}
+                            </span>
+                            <button
+                              onClick={() => removeChordSelection(chord.id)}
+                              disabled={selectedChords.length === 1}
+                              className={clsx(
+                                "text-xs px-2 py-1 rounded border transition-colors",
+                                selectedChords.length === 1
+                                  ? "border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed"
+                                  : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                              )}
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-[110px_1fr] gap-2">
+                            <div className="relative">
+                              <select
+                                value={chord.root}
+                                onChange={(e) => updateChordSelection(chord.id, 'root', e.target.value as NoteName)}
+                                className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-2 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
+                              >
+                                {NOTES.map(note => <option key={note} value={note}>{note}</option>)}
+                              </select>
+                              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+
+                            <div className="relative">
+                              <select
+                                value={chord.chordType}
+                                onChange={(e) => updateChordSelection(chord.id, 'chordType', e.target.value as ChordType)}
+                                className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-2 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
+                              >
+                                {Object.values(ChordType).map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                              </select>
+                              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-violet-200/70 dark:border-violet-800 bg-white/80 dark:bg-slate-900/70 p-3 xl:max-h-[430px] xl:overflow-y-auto custom-scrollbar">
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Solo Scale Suggestions</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {progressionKey} major {activeProgressionPreset ? `• ${activeProgressionPreset.label}` : '• Custom progression'}
+                    </p>
+
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Global</p>
+                      {progressionSuggestions.global.map((suggestion) => (
+                        <div key={suggestion.name} className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">{suggestion.name}</span>
+                            <span
+                              className={clsx(
+                                "text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide font-bold",
+                                suggestion.priority === 'primary'
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                  : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                              )}
+                            >
+                              {suggestion.priority}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">{suggestion.why}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Target by Chord</p>
+                      {progressionSuggestions.perChord.map((entry) => (
+                        <div key={entry.chordLabel} className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-2">
+                          <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">{entry.chordLabel}</p>
+                          <div className="mt-1.5 space-y-1">
+                            {entry.scales.map((suggestion) => (
+                              <p key={`${entry.chordLabel}-${suggestion.name}`} className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                                <span className="font-semibold">{suggestion.name}:</span> {suggestion.why}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
