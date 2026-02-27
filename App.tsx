@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Guitar, Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle } from 'lucide-react';
+import { Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle } from 'lucide-react';
 import clsx from 'clsx';
 import Fretboard from './components/Fretboard';
 import TabGenerator from './components/TabGenerator';
 import VerticalChordChart from './components/VerticalChordChart';
 import TriadFretboard from './components/TriadFretboard';
 import { NOTES, SCALES, CHORDS, POSITION_NAMES, POSITION_COLORS } from './constants';
-import { NoteName, ScaleType, ChordType, Position, Settings, Mode, TriadQuality, StringGroup } from './types';
+import { NoteName, ScaleType, ChordType, Position, Settings, Mode, TriadQuality, StringGroup, KeyMode } from './types';
 import { getScaleNotes, getScaleDegreeChords, getProgressionScaleSuggestions } from './utils/musicLogic';
 
 interface SelectedChord {
@@ -27,7 +27,9 @@ interface ProgressionPreset {
 }
 
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11] as const;
-const DIATONIC_TRIAD_QUALITIES: ChordType[] = [
+const NATURAL_MINOR_INTERVALS = [0, 2, 3, 5, 7, 8, 10] as const;
+
+const MAJOR_DIATONIC_TRIAD_QUALITIES: ChordType[] = [
   ChordType.MAJOR,
   ChordType.MINOR,
   ChordType.MINOR,
@@ -37,12 +39,30 @@ const DIATONIC_TRIAD_QUALITIES: ChordType[] = [
   ChordType.DIMINISHED,
 ];
 
-const CHORD_PROGRESSIONS: ProgressionPreset[] = [
+const MINOR_DIATONIC_TRIAD_QUALITIES: ChordType[] = [
+  ChordType.MINOR,
+  ChordType.DIMINISHED,
+  ChordType.MAJOR,
+  ChordType.MINOR,
+  ChordType.MINOR,
+  ChordType.MAJOR,
+  ChordType.MAJOR,
+];
+
+const MAJOR_CHORD_PROGRESSIONS: ProgressionPreset[] = [
   { id: 'one-five-six-four', label: 'I-V-vi-IV', degrees: [{ degree: 1 }, { degree: 5 }, { degree: 6 }, { degree: 4 }] },
   { id: 'one-four-five', label: 'I-IV-V', degrees: [{ degree: 1 }, { degree: 4 }, { degree: 5 }] },
   { id: 'two-five-one', label: 'ii-V-I', degrees: [{ degree: 2 }, { degree: 5, forceType: ChordType.DOMINANT_7 }, { degree: 1 }] },
   { id: 'six-four-one-five', label: 'vi-IV-I-V', degrees: [{ degree: 6 }, { degree: 4 }, { degree: 1 }, { degree: 5 }] },
   { id: 'one-six-two-five', label: 'I-vi-ii-V', degrees: [{ degree: 1 }, { degree: 6 }, { degree: 2 }, { degree: 5, forceType: ChordType.DOMINANT_7 }] },
+];
+
+const MINOR_CHORD_PROGRESSIONS: ProgressionPreset[] = [
+  { id: 'one-four-five-minor', label: 'i-iv-v', degrees: [{ degree: 1 }, { degree: 4 }, { degree: 5 }] },
+  { id: 'one-six-three-seven', label: 'i-VI-III-VII', degrees: [{ degree: 1 }, { degree: 6 }, { degree: 3 }, { degree: 7 }] },
+  { id: 'two-dim-five-one', label: 'iio-v-i', degrees: [{ degree: 2 }, { degree: 5 }, { degree: 1 }] },
+  { id: 'one-five-six-four-minor', label: 'i-v-VI-iv', degrees: [{ degree: 1 }, { degree: 5 }, { degree: 6 }, { degree: 4 }] },
+  { id: 'one-seven-six-seven', label: 'i-VII-VI-VII', degrees: [{ degree: 1 }, { degree: 7 }, { degree: 6 }, { degree: 7 }] },
 ];
 
 export default function App() {
@@ -69,6 +89,7 @@ export default function App() {
   const [isInfoExpanded, setIsInfoExpanded] = useState(true);
   const [showScaleDegreeHelper, setShowScaleDegreeHelper] = useState(true);
   const [progressionKey, setProgressionKey] = useState<NoteName>('A');
+  const [progressionMode, setProgressionMode] = useState<KeyMode>('Major');
   const [activeProgressionPresetId, setActiveProgressionPresetId] = useState<string | null>(null);
 
   // Ref for Fretboard export
@@ -87,6 +108,10 @@ export default function App() {
     }
   }, [settings.darkMode]);
 
+  useEffect(() => {
+    setActiveProgressionPresetId(null);
+  }, [progressionMode]);
+
   // Derived Data
   const triadDefinition = {
     name: `${triadQuality} Triad`,
@@ -103,14 +128,16 @@ export default function App() {
     : `${POSITION_NAMES[position]} (${position})`;
   const selectedScaleNotes = getScaleNotes(root, scaleType);
   const selectedScaleDegreeChords = getScaleDegreeChords(root, scaleType);
-  const activeProgressionPreset = CHORD_PROGRESSIONS.find((preset) => preset.id === activeProgressionPresetId) ?? null;
+  const activeProgressions = progressionMode === 'Major' ? MAJOR_CHORD_PROGRESSIONS : MINOR_CHORD_PROGRESSIONS;
+  const activeProgressionPreset = activeProgressions.find((preset) => preset.id === activeProgressionPresetId) ?? null;
   const progressionSuggestions = useMemo(
     () =>
       getProgressionScaleSuggestions(
         progressionKey,
-        selectedChords.map((chord) => ({ root: chord.root, chordType: chord.chordType }))
+        selectedChords.map((chord) => ({ root: chord.root, chordType: chord.chordType })),
+        progressionMode
       ),
-    [progressionKey, selectedChords]
+    [progressionKey, selectedChords, progressionMode]
   );
 
   const updateChordSelection = (id: number, field: 'root' | 'chordType', value: NoteName | ChordType) => {
@@ -135,11 +162,14 @@ export default function App() {
   };
 
   const applyProgressionPreset = (preset: ProgressionPreset) => {
+    const scaleIntervals = progressionMode === 'Major' ? MAJOR_SCALE_INTERVALS : NATURAL_MINOR_INTERVALS;
+    const diatonicQualities =
+      progressionMode === 'Major' ? MAJOR_DIATONIC_TRIAD_QUALITIES : MINOR_DIATONIC_TRIAD_QUALITIES;
     const keyIndex = NOTES.indexOf(progressionKey);
     const nextChords: SelectedChord[] = preset.degrees.slice(0, 4).map((degreeData, index) => {
-      const scaleInterval = MAJOR_SCALE_INTERVALS[degreeData.degree - 1];
+      const scaleInterval = scaleIntervals[degreeData.degree - 1];
       const rootNote = NOTES[(keyIndex + scaleInterval) % 12];
-      const defaultChordType = DIATONIC_TRIAD_QUALITIES[degreeData.degree - 1];
+      const defaultChordType = diatonicQualities[degreeData.degree - 1];
 
       return {
         id: index + 1,
@@ -157,15 +187,21 @@ export default function App() {
       
       {/* HEADER */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 backdrop-blur-md bg-opacity-90 dark:bg-opacity-90">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-24 flex items-center justify-between">
           <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400">
-            <Guitar className="h-8 w-8" />
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
                 Fretboard Jedi
               </h1>
-              <p className="text-[10px] uppercase tracking-wider font-semibold opacity-70">Master the Neck</p>
+              <p className="text-sm uppercase tracking-wider font-semibold opacity-70">
+                Master the Neck
+              </p>
             </div>
+            <img
+              src="/logo2.png"
+              alt="Fretboard Jedi secondary logo"
+              className="h-16 w-auto object-contain ml-3"
+            />
           </div>
           <button
             onClick={() => setSettings(prev => ({ ...prev, darkMode: !prev.darkMode }))}
@@ -250,20 +286,36 @@ export default function App() {
                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                           Progression Presets
                         </label>
+                        <div className="inline-flex bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
+                          {(['Major', 'Minor'] as const).map((keyMode) => (
+                            <button
+                              key={keyMode}
+                              onClick={() => setProgressionMode(keyMode)}
+                              className={clsx(
+                                "px-2.5 py-1 text-[11px] font-semibold rounded transition-colors",
+                                progressionMode === keyMode
+                                  ? "bg-violet-500 text-white"
+                                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                              )}
+                            >
+                              {keyMode}
+                            </button>
+                          ))}
+                        </div>
                         <div className="relative w-[130px]">
                           <select
                             value={progressionKey}
                             onChange={(e) => setProgressionKey(e.target.value as NoteName)}
                             className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-1.5 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
                           >
-                            {NOTES.map(note => <option key={note} value={note}>{note} major</option>)}
+                            {NOTES.map(note => <option key={note} value={note}>{note} {progressionMode.toLowerCase()}</option>)}
                           </select>
                           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        {CHORD_PROGRESSIONS.map((preset) => (
+                        {activeProgressions.map((preset) => (
                           <button
                             key={preset.id}
                             onClick={() => applyProgressionPreset(preset)}
@@ -273,7 +325,7 @@ export default function App() {
                                 ? "border-violet-500 bg-violet-500 text-white"
                                 : "border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                             )}
-                            title={`Apply ${preset.label} in ${progressionKey} major`}
+                            title={`Apply ${preset.label} in ${progressionKey} ${progressionMode.toLowerCase()}`}
                           >
                             {preset.label}
                           </button>
@@ -333,7 +385,7 @@ export default function App() {
                   <div className="rounded-lg border border-violet-200/70 dark:border-violet-800 bg-white/80 dark:bg-slate-900/70 p-3 xl:max-h-[430px] xl:overflow-y-auto custom-scrollbar">
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Solo Scale Suggestions</h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      {progressionKey} major {activeProgressionPreset ? `• ${activeProgressionPreset.label}` : '• Custom progression'}
+                      {progressionKey} {progressionMode.toLowerCase()} {activeProgressionPreset ? `- ${activeProgressionPreset.label}` : '- Custom progression'}
                     </p>
 
                     <div className="mt-3 space-y-2">

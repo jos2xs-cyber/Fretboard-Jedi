@@ -6,6 +6,7 @@ import {
   NoteName,
   Position,
   Mode,
+  KeyMode,
   ProgressionScaleSuggestions,
   SoloScaleSuggestion,
 } from '../types';
@@ -301,6 +302,11 @@ const getRelativeMinor = (majorKey: NoteName): NoteName => {
   return NOTES[(majorIdx + 9) % 12];
 };
 
+const getRelativeMajor = (minorKey: NoteName): NoteName => {
+  const minorIdx = getNoteIndex(minorKey);
+  return NOTES[(minorIdx + 3) % 12];
+};
+
 const getChordSuffix = (chordType: ChordType): string => {
   if (chordType === ChordType.MAJOR) return '';
   if (chordType === ChordType.MINOR) return 'm';
@@ -318,8 +324,11 @@ export const getChordDisplayLabel = (root: NoteName, chordType: ChordType): stri
 const getChordScaleSuggestions = (
   progressionKey: NoteName,
   chordRoot: NoteName,
-  chordType: ChordType
+  chordType: ChordType,
+  progressionMode: KeyMode
 ): SoloScaleSuggestion[] => {
+  const keyCenterScaleKind = progressionMode === 'Major' ? 'major' : 'naturalMinor';
+
   if (chordType === ChordType.MAJOR || chordType === ChordType.MAJOR_7) {
     return [
       {
@@ -328,7 +337,7 @@ const getChordScaleSuggestions = (
         priority: 'primary',
       },
       {
-        name: getScaleName(progressionKey, 'major'),
+        name: getScaleName(progressionKey, keyCenterScaleKind),
         why: 'Stays fully inside the progression key.',
         priority: 'secondary',
       },
@@ -343,7 +352,7 @@ const getChordScaleSuggestions = (
         priority: 'primary',
       },
       {
-        name: getScaleName(progressionKey, 'major'),
+        name: getScaleName(progressionKey, keyCenterScaleKind),
         why: 'Connects smoothly back to the full key center.',
         priority: 'secondary',
       },
@@ -367,7 +376,7 @@ const getChordScaleSuggestions = (
 
   return [
     {
-      name: getScaleName(progressionKey, 'major'),
+      name: getScaleName(progressionKey, keyCenterScaleKind),
       why: 'Use key tones first; treat chord tones as passing tension.',
       priority: 'primary',
     },
@@ -381,26 +390,33 @@ const getChordScaleSuggestions = (
 
 export const getProgressionScaleSuggestions = (
   progressionKey: NoteName,
-  chords: Array<{ root: NoteName; chordType: ChordType }>
+  chords: Array<{ root: NoteName; chordType: ChordType }>,
+  progressionMode: KeyMode
 ): ProgressionScaleSuggestions => {
   const relativeMinor = getRelativeMinor(progressionKey);
+  const relativeMajor = getRelativeMajor(progressionKey);
+  const isMajor = progressionMode === 'Major';
 
   return {
     global: [
       {
-        name: getScaleName(progressionKey, 'major'),
-        why: 'Primary all-purpose scale for these major-key presets.',
+        name: isMajor ? getScaleName(progressionKey, 'major') : getScaleName(progressionKey, 'naturalMinor'),
+        why: isMajor
+          ? 'Primary all-purpose scale for this major-key progression.'
+          : 'Primary all-purpose scale for this natural-minor progression.',
         priority: 'primary',
       },
       {
-        name: getScaleName(progressionKey, 'majorPent'),
-        why: `Safe melodic option (relative: ${getScaleName(relativeMinor, 'minorPent')}).`,
+        name: isMajor ? getScaleName(progressionKey, 'majorPent') : getScaleName(progressionKey, 'minorPent'),
+        why: isMajor
+          ? `Safe melodic option (relative: ${getScaleName(relativeMinor, 'minorPent')}).`
+          : `Safe melodic option (relative: ${getScaleName(relativeMajor, 'majorPent')}).`,
         priority: 'secondary',
       },
     ],
     perChord: chords.map((chord) => ({
       chordLabel: getChordDisplayLabel(chord.root, chord.chordType),
-      scales: getChordScaleSuggestions(progressionKey, chord.root, chord.chordType),
+      scales: getChordScaleSuggestions(progressionKey, chord.root, chord.chordType, progressionMode),
     })),
   };
 };

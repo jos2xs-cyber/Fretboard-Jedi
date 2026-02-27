@@ -1,6 +1,7 @@
 export type NoteName = 'A' | 'A#' | 'B' | 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#';
 
 export type Mode = 'Scale' | 'Chord' | 'Triads';
+export type KeyMode = 'Major' | 'Minor';
 
 export enum TriadQuality {
   MAJOR = 'Major',
