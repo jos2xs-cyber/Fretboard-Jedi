@@ -142,6 +142,7 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(() => {
     try { return localStorage.getItem('nn_welcomed') !== '1'; } catch { return true; }
   });
+  const [welcomeInitialTab, setWelcomeInitialTab] = useState<'overview' | 'scales' | 'chords' | 'practice' | 'about'>('overview');
 
   const closeWelcome = () => {
     setShowWelcome(false);
@@ -516,7 +517,7 @@ export default function App() {
           <div className="ml-auto flex items-center gap-2 relative z-10">
             <Tooltip content="Help & Feature Guide" position="bottom">
               <button
-                onClick={() => setShowWelcome(true)}
+                onClick={() => { setWelcomeInitialTab('overview'); setShowWelcome(true); }}
                 className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
                 aria-label="Help"
               >
@@ -571,7 +572,7 @@ export default function App() {
         </div>
       </header>
 
-      {showWelcome && <WelcomeModal onClose={closeWelcome} />}
+      {showWelcome && <WelcomeModal onClose={closeWelcome} initialTab={welcomeInitialTab} />}
 
       <main className="flex-1 max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
         
@@ -1342,10 +1343,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400 dark:text-slate-500">
           <p>Practice slow, play fast 🎸</p>
           <div className="flex items-center gap-3">
-            <span>Built by <strong className="text-slate-500 dark:text-slate-400">James Sanchez</strong></span>
+            <span>Built by <strong className="text-slate-500 dark:text-slate-400">James Build</strong></span>
             <span className="text-slate-300 dark:text-slate-700">·</span>
             <button
-              onClick={() => setShowWelcome(true)}
+              onClick={() => { setWelcomeInitialTab('about'); setShowWelcome(true); }}
               className="hover:text-violet-500 transition-colors"
             >
               About

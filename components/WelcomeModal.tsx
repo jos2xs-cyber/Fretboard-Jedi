@@ -4,6 +4,7 @@ import clsx from 'clsx';
 
 interface WelcomeModalProps {
   onClose: () => void;
+  initialTab?: Tab;
 }
 
 type Tab = 'overview' | 'scales' | 'chords' | 'practice' | 'about';
@@ -175,7 +176,7 @@ function AboutTab() {
           <User size={20} className="text-violet-500" />
         </div>
         <div>
-          <p className="text-sm font-bold text-slate-900 dark:text-white">James Sanchez</p>
+          <p className="text-sm font-bold text-slate-900 dark:text-white">James Build</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">Creator of NeckNinja</p>
         </div>
       </div>
@@ -205,8 +206,8 @@ function AboutTab() {
   );
 }
 
-export default function WelcomeModal({ onClose }: WelcomeModalProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
+export default function WelcomeModal({ onClose, initialTab = 'overview' }: WelcomeModalProps) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -214,8 +215,8 @@ export default function WelcomeModal({ onClose }: WelcomeModalProps) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  // Reset to overview each time modal opens
-  useEffect(() => { setActiveTab('overview'); }, []);
+  // Sync tab when initialTab changes (e.g. footer vs help button)
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
 
   return (
     <div
