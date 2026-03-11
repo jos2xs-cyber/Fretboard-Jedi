@@ -137,6 +137,7 @@ export default function App() {
   const [practicePlaying, setPracticePlaying] = useState(false);
   const [activePracticeChordIndex, setActivePracticeChordIndex] = useState<number | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [activeRun, setActiveRun] = useState<import('./types').RunNote[] | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => {
     try { return localStorage.getItem('nn_welcomed') !== '1'; } catch { return true; }
   });
@@ -179,6 +180,9 @@ export default function App() {
       setAllNotesStringFilter(null);
     }
   }, [mode, scaleView]);
+
+  // Clear run sequence when root, scale, or position changes
+  useEffect(() => { setActiveRun(null); }, [root, scaleType, position]);
 
   useEffect(() => {
     if (mode === 'Triads') {
@@ -489,16 +493,25 @@ export default function App() {
     <div className="min-h-screen flex flex-col font-sans selection:bg-violet-500/30">
       
       {/* HEADER */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50 backdrop-blur-md bg-opacity-90 dark:bg-opacity-90">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-24 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-36 md:h-40 flex items-center relative">
+          {/* Centered logo (kept non-interactive so it doesn't block header buttons). */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <img
-              src="/NeckNinjaLogo.png"
+              src="/neckninjalogo2.png"
               alt="NeckNinja logo"
-              className="h-16 w-auto object-contain"
+              className="w-[220px] sm:w-[280px] md:w-[360px] h-auto object-contain"
             />
+            <div className="mt-2 text-center">
+              <div className="text-slate-900 dark:text-slate-100 font-extrabold tracking-tight text-3xl sm:text-4xl md:text-5xl leading-none">
+                NeckNinja
+              </div>
+              <div className="mt-1 font-bold uppercase tracking-[0.18em] text-sm sm:text-base md:text-lg leading-none text-[#18D5D9]">
+                Master the Neck
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 relative z-10">
             <Tooltip content="Help & Feature Guide" position="bottom">
               <button
                 onClick={() => setShowWelcome(true)}
@@ -1179,6 +1192,7 @@ export default function App() {
                  showAllNotes={isScaleAllNotesView}
                  activeStringFilter={isScaleAllNotesView ? allNotesStringFilter : undefined}
                  onStringFilterChange={isScaleAllNotesView ? setAllNotesStringFilter : undefined}
+                 sequenceNotes={activeRun ?? undefined}
                />
              ) : (
                <Fretboard
@@ -1285,15 +1299,16 @@ export default function App() {
               )}
             </div>
 
-            {/* Right: Tab Gen (only for Scale mode) */}
+            {/* Right: Neck Runs (only for Scale pattern mode) */}
             {mode === 'Scale' && scaleView === 'pattern' && (
               <div>
                 <TabGenerator
                     root={root}
-                    type={scaleType}
-                    mode={mode}
+                    scaleType={scaleType}
                     position={position}
-                    fretboardRef={fretboardRef as React.RefObject<HTMLDivElement>}
+                    activeRun={activeRun}
+                    onRunGenerated={setActiveRun}
+                    onClearRun={() => setActiveRun(null)}
                 />
               </div>
             )}
@@ -1306,5 +1321,3 @@ export default function App() {
     </div>
   );
 }
-
-

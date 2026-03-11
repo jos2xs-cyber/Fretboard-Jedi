@@ -9,6 +9,7 @@ import {
   KeyMode,
   ProgressionScaleSuggestions,
   SoloScaleSuggestion,
+  RunNote,
 } from '../types';
 
 export interface ScaleDegreeInfo {
@@ -286,6 +287,114 @@ export const getTabContent = (
 
     return lines.map(line => line.join('')).join('\n');
 };
+
+// ─── Scale Run Generators ────────────────────────────────────────────────────
+
+/** Plays current CAGED position string-by-string, low E → high e */
+export const generateBoxRun = (
+  root: NoteName,
+  scaleType: ScaleType,
+  position: Position,
+): RunNote[] => {
+  const notes = generateFretboard(root, scaleType, position, 'Scale');
+  const active = notes.filter(n => n.opacity >= 0.5);
+  active.sort((a, b) => {
+    if (a.stringIndex !== b.stringIndex) return a.stringIndex - b.stringIndex;
+    return a.fret - b.fret;
+  });
+  return active.map((n, i) => ({
+    stringIndex: n.stringIndex,
+    fret: n.fret,
+    note: n.note,
+    interval: n.interval,
+    sequence: i + 1,
+  }));
+};
+
+/**
+ * 3-note-per-string (2 for pentatonic) diagonal run starting at Position 1.
+ * Each string advances the fret window forward so the pattern travels diagonally up the neck.
+ */
+export const generateDiagonalRun = (
+  root: NoteName,
+  scaleType: ScaleType,
+): RunNote[] => {
+  const scale = SCALES[scaleType];
+  const p1Start = getPosition1StartFret(root);
+  const runNotes: RunNote[] = [];
+  let seq = 1;
+  const notesPerString = scale.intervals.length <= 5 ? 2 : 3;
+  let windowFret = Math.max(0, p1Start - 1);
+
+  for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
+    const onString: { fret: number; note: NoteName; interval: number }[] = [];
+    for (let fret = 0; fret <= 24; fret++) {
+      const n = getNoteAtFret(stringIdx, fret);
+      const interval = getIntervalFromRoot(root, n);
+      if (scale.intervals.includes(interval)) {
+        onString.push({ fret, note: n, interval });
+      }
+    }
+    const startIdx = onString.findIndex(n => n.fret >= windowFret);
+    if (startIdx === -1) continue;
+    const slice = onString.slice(startIdx, startIdx + notesPerString);
+    if (slice.length === 0) continue;
+    slice.forEach(n => {
+      runNotes.push({ stringIndex: stringIdx, fret: n.fret, note: n.note, interval: n.interval, sequence: seq++ });
+    });
+    // Advance window to last note of this slice to enforce the diagonal
+    windowFret = slice[slice.length - 1].fret;
+  }
+  return runNotes;
+};
+
+const STRING_BASE_PITCH = [0, 5, 10, 15, 19, 24] as const; // semitones above open Low E
+
+/** All scale notes across the neck (frets 0–15) sorted ascending by pitch */
+export const generateFullNeckRun = (
+  root: NoteName,
+  scaleType: ScaleType,
+): RunNote[] => {
+  const notes = generateFretboard(root, scaleType, 'Full Neck', 'Scale');
+  const active = notes.filter(n => n.fret <= 15);
+  active.sort((a, b) => {
+    const pitchA = STRING_BASE_PITCH[a.stringIndex] + a.fret;
+    const pitchB = STRING_BASE_PITCH[b.stringIndex] + b.fret;
+    return pitchA - pitchB;
+  });
+  return active.map((n, i) => ({
+    stringIndex: n.stringIndex,
+    fret: n.fret,
+    note: n.note,
+    interval: n.interval,
+    sequence: i + 1,
+  }));
+};
+
+/** Convert a RunNote sequence to guitar tab text */
+export const getRunTabContent = (
+  runNotes: RunNote[],
+  direction: 'Ascending' | 'Descending' | 'Up & Down',
+): string => {
+  if (runNotes.length === 0) return '';
+  let sequence = [...runNotes];
+  if (direction === 'Descending') sequence.reverse();
+  else if (direction === 'Up & Down') sequence = [...sequence, ...[...sequence].reverse().slice(1, -1)];
+
+  const lines: string[][] = [['e', '|'], ['B', '|'], ['G', '|'], ['D', '|'], ['A', '|'], ['E', '|']];
+  sequence.forEach(note => {
+    const fretStr = note.fret.toString();
+    const lineIdx = 5 - note.stringIndex;
+    lines.forEach((line, idx) => {
+      if (idx === lineIdx) line.push(fretStr + '-');
+      else line.push('-'.repeat(fretStr.length + 1));
+    });
+  });
+  lines.forEach(line => line.push('|'));
+  return lines.map(line => line.join('')).join('\n');
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const getScaleName = (
   root: NoteName,

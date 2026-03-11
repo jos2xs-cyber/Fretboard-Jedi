@@ -78,3 +78,11 @@ export interface Settings {
   showConnections: boolean;
   darkMode: boolean;
 }
+
+export interface RunNote {
+  stringIndex: number;
+  fret: number;
+  note: NoteName;
+  interval: number;
+  sequence: number;
+}

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { NoteName, ScaleType, Position, Settings } from '../types';
+import { NoteName, ScaleType, Position, Settings, RunNote } from '../types';
 import { POSITION_COLORS, POSITION_NAMES } from '../constants';
 import { generateFretboard } from '../utils/musicLogic';
 import clsx from 'clsx';
@@ -29,6 +29,7 @@ interface VerticalScaleFretboardProps {
   showAllNotes?: boolean;
   activeStringFilter?: number | null;
   onStringFilterChange?: (idx: number | null) => void;
+  sequenceNotes?: RunNote[];
 }
 
 const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
@@ -39,6 +40,7 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
   showAllNotes = false,
   activeStringFilter = null,
   onStringFilterChange,
+  sequenceNotes,
 }) => {
   // When showing all notes, force Full Neck so every chromatic note gets opacity=1
   const effectivePosition: Position = showAllNotes ? 'Full Neck' : position;
@@ -52,17 +54,19 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
 
   const isFullNeck = effectivePosition === 'Full Neck';
 
-  // Determine visible fret window
+  // Determine visible fret window (expand to include any active sequence run)
   const { minFret, maxFret } = useMemo(() => {
     if (showAllNotes) return { minFret: 0, maxFret: 24 };
-    if (isFullNeck) return { minFret: 0, maxFret: 18 };
+    if (isFullNeck && !sequenceNotes?.length) return { minFret: 0, maxFret: 18 };
     const frets = activeNotes.filter(n => n.fret > 0).map(n => n.fret);
-    if (frets.length === 0) return { minFret: 0, maxFret: 7 };
+    const seqFrets = sequenceNotes?.filter(n => n.fret > 0).map(n => n.fret) ?? [];
+    const allFrets = [...frets, ...seqFrets];
+    if (allFrets.length === 0) return { minFret: 0, maxFret: 7 };
     return {
-      minFret: Math.max(0, Math.min(...frets) - 1),
-      maxFret: Math.min(24, Math.max(...frets) + 1),
+      minFret: Math.max(0, Math.min(...allFrets) - 1),
+      maxFret: Math.min(24, Math.max(...allFrets) + 1),
     };
-  }, [activeNotes, isFullNeck, showAllNotes]);
+  }, [activeNotes, isFullNeck, showAllNotes, sequenceNotes]);
 
   const fretHeight = 46;
   const stringSpacing = 48;
@@ -273,6 +277,35 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
               </div>
             );
           })}
+
+          {/* Sequence run overlay — amber numbered badges showing playing order */}
+          {sequenceNotes && sequenceNotes
+            .filter(rn => rn.fret >= minFret && rn.fret <= maxFret)
+            .map(rn => {
+              const x = 20 + rn.stringIndex * stringSpacing;
+              const y = rn.fret === 0
+                ? nutHeight / 2
+                : nutHeight + (rn.fret - minFret) * fretHeight - fretHeight / 2;
+              const size = 26;
+              const half = size / 2;
+              return (
+                <div
+                  key={`seq-${rn.sequence}`}
+                  className="absolute rounded-full flex items-center justify-center font-bold text-slate-900 shadow-lg z-20 ring-2 ring-white/70"
+                  style={{
+                    width: size,
+                    height: size,
+                    left: x - half,
+                    top: y - half,
+                    backgroundColor: '#fbbf24',
+                    fontSize: rn.sequence > 9 ? 8 : 10,
+                  }}
+                >
+                  {rn.sequence}
+                </div>
+              );
+            })
+          }
         </div>
       </div>
     </div>
