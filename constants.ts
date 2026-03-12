@@ -11,7 +11,7 @@ export const SCALES: Record<ScaleType, MusicalDefinition> = {
     name: ScaleType.MINOR_PENTATONIC,
     intervals: [0, 3, 5, 7, 10],
     description: "The essential rock and blues scale. Five notes per octave.",
-    tip: "Master Position 1 first. It's the 'home base' for 90% of guitar solos."
+    tip: "Master Box 1 first. It's the 'home base' for 90% of guitar solos."
   },
   [ScaleType.MAJOR_PENTATONIC]: {
     name: ScaleType.MAJOR_PENTATONIC,
@@ -111,9 +111,9 @@ export const POSITION_COLORS = {
 };
 
 export const POSITION_NAMES = {
-  1: "E-Shape",
-  2: "D-Shape",
-  3: "C-Shape",
-  4: "A-Shape",
-  5: "G-Shape",
+  1: "Box 1",
+  2: "Box 2",
+  3: "Box 3",
+  4: "Box 4",
+  5: "Box 5",
 };

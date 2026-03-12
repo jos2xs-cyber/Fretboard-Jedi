@@ -27,8 +27,11 @@ interface VerticalScaleFretboardProps {
   position: Position;
   settings: Settings;
   showAllNotes?: boolean;
+  hideScaleNotes?: boolean;
   activeStringFilter?: number | null;
   onStringFilterChange?: (idx: number | null) => void;
+  activeNoteFilter?: NoteName | null;
+  onNoteFilterChange?: (note: NoteName | null) => void;
   sequenceNotes?: RunNote[];
 }
 
@@ -38,8 +41,11 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
   position,
   settings,
   showAllNotes = false,
+  hideScaleNotes = false,
   activeStringFilter = null,
   onStringFilterChange,
+  activeNoteFilter = null,
+  onNoteFilterChange,
   sequenceNotes,
 }) => {
   // When showing all notes, force Full Neck so every chromatic note gets opacity=1
@@ -102,6 +108,10 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
     (activeStringFilter == null || n.stringIndex === activeStringFilter)
   );
 
+  // Open scale notes — only those active in the current position (opacity >= 0.5).
+  // This means ○ markers only appear when the current box actually includes fret 0.
+  const openNotes = activeNotes.filter(n => n.fret === 0);
+
   const SINGLE_INLAY_FRETS = [3, 5, 7, 9, 15, 17, 19, 21];
   const DOUBLE_INLAY_FRETS = [12, 24];
 
@@ -131,6 +141,37 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
               >
                 {label}
               </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Open string indicators — "Open" label + ○ per string column above the nut */}
+      {!hideScaleNotes && openNotes.length > 0 && (
+        <div className="flex items-center mb-5">
+          {/* "Open" label — occupies the same width as the left rail + string offset */}
+          <div
+            className="flex-none flex items-center justify-end pr-2 text-[9px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500"
+            style={{ width: leftRailWidth + 20 - stringSpacing / 2 }}
+          >
+            Open
+          </div>
+          {/* ○ per string — transparent placeholder keeps spacing for strings not in scale */}
+          {Array.from({ length: 6 }).map((_, stringIdx) => {
+            const n = openNotes.find(on => on.stringIndex === stringIdx);
+            const color = n
+              ? showAllNotes
+                ? NOTE_COLORS[n.note] ?? '#64748b'
+                : (POSITION_COLORS[isFullNeck ? n.positionIndex as 1|2|3|4|5 : position as 1|2|3|4|5] || POSITION_COLORS[1])
+              : undefined;
+            return (
+              <div
+                key={stringIdx}
+                className="flex-none flex items-center justify-center font-bold text-base"
+                style={{ width: stringSpacing, color: color ?? 'transparent' }}
+              >
+                {n ? '○' : '·'}
+              </div>
             );
           })}
         </div>
@@ -242,7 +283,7 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
           ))}
 
           {/* Notes */}
-          {visibleNotes.map((note, idx) => {
+          {!hideScaleNotes && visibleNotes.map((note, idx) => {
             const x = 20 + note.stringIndex * stringSpacing;
             const y = note.fret === 0
               ? nutHeight / 2
@@ -255,13 +296,19 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
             const isRoot = note.isRoot && !isFullNeck && !showAllNotes;
             const size = isRoot ? 36 : 32;
             const half = size / 2;
+            const isNoteFiltered = showAllNotes && activeNoteFilter !== null && note.note !== activeNoteFilter;
+            const isActiveFiltered = showAllNotes && activeNoteFilter === note.note;
+            const dotOpacity = isNoteFiltered ? 0.15 : note.opacity;
 
             return (
               <div
                 key={`note-${idx}`}
+                onClick={showAllNotes ? () => onNoteFilterChange?.(activeNoteFilter === note.note ? null : note.note) : undefined}
                 className={clsx(
                   'absolute rounded-full flex items-center justify-center font-bold text-white shadow-md z-10',
-                  isRoot && 'ring-2 ring-white'
+                  isRoot && 'ring-2 ring-white',
+                  showAllNotes ? 'cursor-pointer' : 'cursor-default',
+                  isActiveFiltered && 'ring-2 ring-white scale-110 z-20'
                 )}
                 style={{
                   width: size,
@@ -270,7 +317,7 @@ const VerticalScaleFretboard: React.FC<VerticalScaleFretboardProps> = ({
                   top: y - half,
                   backgroundColor: color,
                   fontSize: settings.showNoteNames ? 10 : undefined,
-                  opacity: note.opacity,
+                  opacity: dotOpacity,
                 }}
               >
                 {settings.showNoteNames && note.note}

@@ -47,7 +47,7 @@ function OverviewTab() {
         {
           icon: <Music size={18} className="text-violet-500 shrink-0 mt-0.5" />,
           title: 'Scales',
-          body: 'Visualize scales across the neck by CAGED position or see every note on every string. Great for soloing and fretboard memorization.',
+          body: 'Visualize scales across the neck by box position or see every note on every string. Great for soloing and fretboard memorization.',
         },
         {
           icon: <Layers size={18} className="text-violet-500 shrink-0 mt-0.5" />,
@@ -72,7 +72,7 @@ function OverviewTab() {
       <Tip>
         <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">💡 Start here</p>
         <p className="text-xs text-violet-600 dark:text-violet-400 mt-1 leading-relaxed">
-          Go to <strong>Scales → Scale Pattern</strong>, pick any root and <strong>Minor Pentatonic</strong>, then select <strong>Position 1</strong>. That single box shape is the foundation of most rock and blues soloing.
+          Go to <strong>Scales → Scale Pattern</strong>, pick any root and <strong>Minor Pentatonic</strong>, then select <strong>Box 1</strong>. That single box shape is the foundation of most rock and blues soloing.
         </p>
       </Tip>
 
@@ -86,13 +86,13 @@ function OverviewTab() {
 function ScalesTab() {
   return (
     <div className="space-y-3">
-      <Section title="CAGED Positions">
-        <p>The neck is divided into 5 overlapping positions, each built around a familiar open chord shape (C, A, G, E, D). Each position is color-coded.</p>
-        <p className="mt-1"><strong className="text-slate-700 dark:text-slate-300">Position 1 (E-shape)</strong> is the most common starting point — usually around frets 5–8 depending on your key.</p>
+      <Section title="The 5 Box Positions">
+        <p>The neck is divided into 5 overlapping boxes. Each box is a group of scale notes you can play within a ~4-fret window. Each box is color-coded.</p>
+        <p className="mt-1"><strong className="text-slate-700 dark:text-slate-300">Box 1</strong> is always the lowest position on the neck for your key. Work through Box 1 → Box 5 to map the full neck.</p>
       </Section>
 
       <Section title="Scale Pattern vs All Notes">
-        <p><strong className="text-slate-700 dark:text-slate-300">Scale Pattern</strong> — shows notes filtered to a specific CAGED position. Use the position selector to focus on one box at a time.</p>
+        <p><strong className="text-slate-700 dark:text-slate-300">Scale Pattern</strong> — shows notes filtered to a specific box position. Use the position selector to focus on one box at a time.</p>
         <p><strong className="text-slate-700 dark:text-slate-300">All Notes</strong> — shows every occurrence of every scale note across all 24 frets, colored by note name. Great for seeing the big picture.</p>
       </Section>
 
@@ -104,7 +104,7 @@ function ScalesTab() {
       <Tip>
         <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">💡 Practice tip</p>
         <p className="text-xs text-violet-600 dark:text-violet-400 mt-1 leading-relaxed">
-          Learn Position 1 first, then Position 5 (it connects directly below it). Those two cover the most common solo territory for any key.
+          Start with Box 1, then learn the box directly above it (Box 2). Those two positions cover the most common solo territory for any key before you expand up the neck.
         </p>
       </Tip>
     </div>

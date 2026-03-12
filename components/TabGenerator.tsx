@@ -1,7 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { NoteName, ScaleType, Position, RunNote } from '../types';
 import { generateBoxRun, generateDiagonalRun, generateFullNeckRun, getRunTabContent } from '../utils/musicLogic';
-import * as htmlToImage from 'html-to-image';
 import { Download, X, Mail, ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -17,7 +16,7 @@ interface TabGeneratorProps {
 }
 
 const RUN_TYPES: { id: RunType; label: string; emoji: string; desc: string }[] = [
-  { id: 'box',      label: 'Position Box',  emoji: '⬜', desc: 'Stay within current CAGED position' },
+  { id: 'box',      label: 'Position Box',  emoji: '⬜', desc: 'Stay within the current box position' },
   { id: 'diagonal', label: 'Diagonal Run',  emoji: '↗',  desc: '3-per-string, travels across the neck' },
   { id: 'fullNeck', label: 'Full Neck',     emoji: '🎸', desc: 'All positions in ascending pitch order' },
 ];
@@ -49,7 +48,6 @@ const TabGenerator: React.FC<TabGeneratorProps> = ({
   const [showEmailGate, setShowEmailGate] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
 
   const tabText = activeRun ? getRunTabContent(activeRun, direction) : null;
   const runLabel = RUN_TYPES.find(r => r.id === runType)?.label ?? '';
@@ -62,14 +60,60 @@ const TabGenerator: React.FC<TabGeneratorProps> = ({
     onRunGenerated(notes);
   };
 
-  const doDownload = async () => {
-    if (!exportRef.current) return;
+  const doDownload = () => {
+    if (!tabText) return;
     setDownloading(true);
     try {
-      const dataUrl = await htmlToImage.toPng(exportRef.current, { pixelRatio: 2 });
+      const scale = 2;
+      const font = '"Courier New", Courier, monospace';
+      const padding = 28;
+      const lineHeight = 26;
+      const fontSize = 14;
+      const lines = tabText.split('\n');
+
+      // Measure canvas width
+      const measureCanvas = document.createElement('canvas');
+      const mCtx = measureCanvas.getContext('2d')!;
+      mCtx.font = `${fontSize}px ${font}`;
+      const maxLineWidth = Math.max(...lines.map(l => mCtx.measureText(l).width));
+
+      const headerHeight = 58;
+      const W = Math.max(maxLineWidth + padding * 2, 300);
+      const H = headerHeight + lines.length * lineHeight + padding * 2;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W * scale;
+      canvas.height = H * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(scale, scale);
+
+      // Background
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, W, H);
+
+      // Brand
+      ctx.font = `bold 13px ${font}`;
+      ctx.fillStyle = '#a78bfa';
+      ctx.fillText('NECKNINJA', padding, padding + 14);
+      ctx.font = `10px ${font}`;
+      ctx.fillStyle = '#475569';
+      ctx.fillText('neckninja.app', padding + 112, padding + 14);
+
+      // Subtitle
+      ctx.font = `11px ${font}`;
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`${root} ${scaleType} · ${runLabel} · ${direction}`, padding, padding + 34);
+
+      // Tab lines
+      ctx.font = `${fontSize}px ${font}`;
+      ctx.fillStyle = '#4ade80';
+      lines.forEach((line, i) => {
+        ctx.fillText(line, padding, headerHeight + padding + i * lineHeight);
+      });
+
       const link = document.createElement('a');
       link.download = `NeckNinja_${root}_${scaleType.replace(/\s/g, '_')}_${runType}.png`;
-      link.href = dataUrl;
+      link.href = canvas.toDataURL('image/png');
       link.click();
     } finally {
       setDownloading(false);
@@ -77,11 +121,7 @@ const TabGenerator: React.FC<TabGeneratorProps> = ({
   };
 
   const handleDownloadClick = () => {
-    if (hasPassedEmailGate()) {
-      doDownload();
-    } else {
-      setShowEmailGate(true);
-    }
+    doDownload();
   };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
@@ -100,39 +140,11 @@ const TabGenerator: React.FC<TabGeneratorProps> = ({
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-full">
 
-      {/* Hidden export card — captured as PNG */}
-      <div
-        ref={exportRef}
-        style={{
-          position: 'fixed',
-          left: '-9999px',
-          top: 0,
-          background: '#0f172a',
-          padding: '24px 28px',
-          borderRadius: 12,
-          width: 'max-content',
-          maxWidth: 800,
-          fontFamily: '"Courier New", Courier, monospace',
-          pointerEvents: 'none',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-          <span style={{ color: '#a78bfa', fontSize: 13, fontWeight: 700, letterSpacing: '0.08em' }}>NECKNINJA</span>
-          <span style={{ color: '#475569', fontSize: 10 }}>neckninja.app</span>
-        </div>
-        <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 18, marginTop: 0 }}>
-          {root} {scaleType} · {runLabel} · {direction}
-        </p>
-        <pre style={{ color: '#4ade80', fontSize: 14, lineHeight: 1.8, margin: 0, whiteSpace: 'pre' }}>
-          {tabText ?? ''}
-        </pre>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
         <div>
           <h3 className="font-bold text-base text-slate-800 dark:text-white flex items-center gap-2">
-            <span>↗</span> Neck Runs
+            <span>↗</span> Scale Practice Runs
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Generate a scale run — numbers appear on the neck above
@@ -254,15 +266,20 @@ const TabGenerator: React.FC<TabGeneratorProps> = ({
                 </div>
               </form>
             ) : (
-              <button
-                onClick={handleDownloadClick}
-                disabled={downloading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-green-400 font-bold text-sm border border-slate-700 dark:border-slate-600 transition-colors active:scale-[0.98] disabled:opacity-60"
-              >
-                <Download size={15} />
-                {downloading ? 'Downloading…' : 'Download Image'}
-                <ChevronRight size={13} className="opacity-40" />
-              </button>
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+                  Save to your local device or print for offline practice
+                </p>
+                <button
+                  onClick={handleDownloadClick}
+                  disabled={downloading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-800 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-green-400 font-bold text-sm border border-slate-700 dark:border-slate-600 transition-colors active:scale-[0.98] disabled:opacity-60"
+                >
+                  <Download size={15} />
+                  {downloading ? 'Saving…' : 'Save Run as Image'}
+                  <ChevronRight size={13} className="opacity-40" />
+                </button>
+              </div>
             )}
           </div>
         ) : (

@@ -129,33 +129,30 @@ export const generateFretboard = (
   // Find where Position 1 starts (Root on Low E)
   const p1Start = getPosition1StartFret(root);
 
-  // CAGED Position Ranges relative to P1 Root Fret (R)
-  const getFretRange = (pos: number, rootFret: number): {min: number, max: number}[] => {
-    // Basic offsets for standard CAGED boxes (approximate, covers most scale types)
-    const offsets = [
-      { min: -1, max: 3 }, // P1 (E Shape)
-      { min: 2, max: 5 },  // P2 (D Shape)
-      { min: 4, max: 8 },  // P3 (C Shape)
-      { min: 7, max: 10 }, // P4 (A Shape)
-      { min: 9, max: 13 }, // P5 (G Shape)
-    ];
-    
-    const offset = offsets[pos - 1];
-    const ranges = [];
-    
-    // Base range
-    let min = rootFret + offset.min;
-    let max = rootFret + offset.max;
-    ranges.push({ min, max });
-    
-    // Octave up
-    ranges.push({ min: min + 12, max: max + 12 });
-    
-    // Octave down
-    ranges.push({ min: min - 12, max: max - 12 });
-    
-    return ranges;
+  // 5 box ranges anchored to the root on Low E (Position 1 = root box, ascending up the neck).
+  // Each position uses only its single base range — no octave copies — so filtering shows
+  // one clean compact box. Octave copies are only used for Full Neck position coloring.
+  const BOX_OFFSETS = [
+    { min: -1, max: 3 },  // Box 1 (root-anchored)
+    { min: 2,  max: 5 },  // Box 2
+    { min: 4,  max: 8 },  // Box 3
+    { min: 7,  max: 10 }, // Box 4
+    { min: 9,  max: 13 }, // Box 5
+  ];
+  // Root-anchored box ranges — Box 1 always starts at the root on Low E.
+  const boxRanges = BOX_OFFSETS.map(o => ({ min: p1Start + o.min, max: p1Start + o.max }));
+
+  // All octave copies of a position that land on the physical neck (frets 0–24).
+  // Used for both position filtering and Full Neck coloring.
+  const getOctaveCopies = (pos: number) => {
+    const base = boxRanges[pos - 1];
+    return [base, { min: base.min + 12, max: base.max + 12 }, { min: base.min - 12, max: base.max - 12 }];
   };
+
+  // Copies visible on the neck — used when a specific box is selected so both the
+  // root position AND its octave repeat(s) light up at full opacity.
+  const getVisibleRanges = (pos: number) =>
+    getOctaveCopies(pos).filter(r => r.max >= 0 && r.min <= 24);
 
   for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
     for (let fret = 0; fret <= 24; fret++) {
@@ -167,41 +164,30 @@ export const generateFretboard = (
 
       if (!isCorrectNote) continue;
 
-      // Determine which position this note "belongs" to.
+      // Assign box color using all octave copies (so Full Neck shows color across whole neck)
       let posIndex = 0;
-      
-      // Check each position to assign color/id
       for (let p = 1; p <= 5; p++) {
-        const ranges = getFretRange(p, p1Start);
-        for (const r of ranges) {
-           if (fret >= r.min && fret <= r.max) {
-             posIndex = p;
-             break;
-           }
+        if (getOctaveCopies(p).some(r => fret >= r.min && fret <= r.max)) {
+          posIndex = p;
+          break;
         }
-        if (posIndex !== 0) break; 
       }
-      
-      if (posIndex === 0) {
-         posIndex = 1; 
-      }
+      if (posIndex === 0) posIndex = 1;
 
-      // Visibility Logic
-      let opacity = 0.2; // Dimmed by default
+      // Visibility logic
+      let opacity = 0.2;
       if (currentPosition === 'Full Neck') {
         opacity = 1;
       } else {
-        // Check if this specific note matches the requested position range
-        const targetRanges = getFretRange(currentPosition, p1Start);
-        const inRange = targetRanges.some(r => fret >= r.min && fret <= r.max);
-        
+        // Show all octave copies of this box that land on the neck
+        const inRange = getVisibleRanges(Number(currentPosition)).some(
+          r => fret >= r.min && fret <= r.max
+        );
         if (inRange) {
           opacity = 1;
-          // In Chord Mode, we often want to strictly visualize the "shape", 
-          // but relying on the same logic works well because the "shape" is defined by the CAGED box anyway.
-          posIndex = currentPosition; 
+          posIndex = Number(currentPosition);
         } else {
-            opacity = 0.15;
+          opacity = 0.15;
         }
       }
 
@@ -350,25 +336,25 @@ export const generateDiagonalRun = (
 
 const STRING_BASE_PITCH = [0, 5, 10, 15, 19, 24] as const; // semitones above open Low E
 
-/** All scale notes across the neck (frets 0–15) sorted ascending by pitch */
+/** Full neck sweep: all scale notes on every string from fret 0–22, string by string (Low E → high e) */
 export const generateFullNeckRun = (
   root: NoteName,
   scaleType: ScaleType,
 ): RunNote[] => {
-  const notes = generateFretboard(root, scaleType, 'Full Neck', 'Scale');
-  const active = notes.filter(n => n.fret <= 15);
-  active.sort((a, b) => {
-    const pitchA = STRING_BASE_PITCH[a.stringIndex] + a.fret;
-    const pitchB = STRING_BASE_PITCH[b.stringIndex] + b.fret;
-    return pitchA - pitchB;
-  });
-  return active.map((n, i) => ({
-    stringIndex: n.stringIndex,
-    fret: n.fret,
-    note: n.note,
-    interval: n.interval,
-    sequence: i + 1,
-  }));
+  const scale = SCALES[scaleType];
+  const runNotes: RunNote[] = [];
+  let seq = 1;
+
+  for (let stringIdx = 0; stringIdx < 6; stringIdx++) {
+    for (let fret = 0; fret <= 22; fret++) {
+      const note = getNoteAtFret(stringIdx, fret);
+      const interval = getIntervalFromRoot(root, note);
+      if (scale.intervals.includes(interval)) {
+        runNotes.push({ stringIndex: stringIdx, fret, note, interval, sequence: seq++ });
+      }
+    }
+  }
+  return runNotes;
 };
 
 /** Convert a RunNote sequence to guitar tab text */

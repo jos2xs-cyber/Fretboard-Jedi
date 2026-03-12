@@ -3,7 +3,6 @@ import { Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle, Link2
 import clsx from 'clsx';
 import Fretboard from './components/Fretboard';
 import VerticalScaleFretboard from './components/VerticalScaleFretboard';
-import TabGenerator from './components/TabGenerator';
 import VerticalChordChart from './components/VerticalChordChart';
 import TriadFretboard from './components/TriadFretboard';
 import Tooltip from './components/Tooltip';
@@ -125,7 +124,7 @@ export default function App() {
     showConnections: true,
     darkMode: true, // Default to dark as per request
   });
-  const [isInfoExpanded, setIsInfoExpanded] = useState(true);
+  const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [showScaleDegreeHelper, setShowScaleDegreeHelper] = useState(true);
   const [allNotesStringFilter, setAllNotesStringFilter] = useState<number | null>(null);
   const [allNotesNoteFilter, setAllNotesNoteFilter] = useState<NoteName | null>(null);
@@ -138,7 +137,6 @@ export default function App() {
   const [practicePlaying, setPracticePlaying] = useState(false);
   const [activePracticeChordIndex, setActivePracticeChordIndex] = useState<number | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const [activeRun, setActiveRun] = useState<import('./types').RunNote[] | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => {
     try { return localStorage.getItem('nn_welcomed') !== '1'; } catch { return true; }
   });
@@ -154,13 +152,6 @@ export default function App() {
   const metronomeTimerRef = React.useRef<number | null>(null);
   const progressionTimerRef = React.useRef<number | null>(null);
   const metronomeBeatRef = React.useRef(0);
-
-  // Ref for Fretboard export
-  const fretboardRef = React.useRef<HTMLDivElement>(null);
-  const setFretboardRef = (ref: React.RefObject<HTMLDivElement>) => {
-      // @ts-ignore - assigning current purely for the TabGenerator to access
-      fretboardRef.current = ref.current;
-  };
 
   // Dark Mode Effect
   useEffect(() => {
@@ -183,9 +174,6 @@ export default function App() {
       setAllNotesNoteFilter(null);
     }
   }, [mode, scaleView]);
-
-  // Clear run sequence when root, scale, or position changes
-  useEffect(() => { setActiveRun(null); }, [root, scaleType, position]);
 
   useEffect(() => {
     if (mode === 'Triads') {
@@ -577,7 +565,7 @@ export default function App() {
       <main className="flex-1 max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
         
         {/* CONTROL PANEL */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 space-y-6">
+        <div className={clsx("bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 space-y-6", mode === 'Scale' && 'lg:hidden')}>
           
           <div className="flex flex-col lg:flex-row gap-6 lg:items-end">
             
@@ -825,28 +813,8 @@ export default function App() {
                         {/* Row 1: view toggle + optional tooltip */}
                         <div className="flex items-center gap-2">
                           <div className="inline-flex bg-slate-100 dark:bg-slate-900 rounded-md p-0.5 w-fit">
-                            <button
-                              onClick={() => setScaleView('pattern')}
-                              className={clsx(
-                                "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
-                                scaleView === 'pattern'
-                                  ? "bg-violet-500 text-white"
-                                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              )}
-                            >
-                              Scale Pattern
-                            </button>
-                            <button
-                              onClick={() => setScaleView('allNotes')}
-                              className={clsx(
-                                "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
-                                scaleView === 'allNotes'
-                                  ? "bg-violet-500 text-white"
-                                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              )}
-                            >
-                              All Notes
-                            </button>
+                            <button onClick={() => setScaleView('pattern')} className={clsx("px-3 py-1.5 text-xs font-semibold rounded transition-colors", scaleView === 'pattern' ? "bg-violet-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700")}>Scale Pattern</button>
+                            <button onClick={() => setScaleView('allNotes')} className={clsx("px-3 py-1.5 text-xs font-semibold rounded transition-colors", scaleView === 'allNotes' ? "bg-violet-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700")}>All Notes</button>
                           </div>
                           {scaleView === 'allNotes' && (
                             <Tooltip content="Tip: click a string label (6th, 5th…) on the fretboard to filter notes to just that string. Click again to show all strings." position="bottom">
@@ -857,35 +825,35 @@ export default function App() {
                             </Tooltip>
                           )}
                         </div>
-                        {/* Row 2: layout toggle — always directly below */}
+                        {/* Row 2: layout toggle */}
                         <div className="inline-flex bg-slate-100 dark:bg-slate-900 rounded-md p-0.5 w-fit">
-                          <Tooltip content="Horizontal fretboard — great for seeing the full neck at once" position="bottom">
-                            <button
-                              onClick={() => setScaleLayout('horizontal')}
-                              className={clsx(
-                                "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
-                                scaleLayout === 'horizontal'
-                                  ? "bg-violet-500 text-white"
-                                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              )}
-                            >
-                              Horizontal
-                            </button>
-                          </Tooltip>
-                          <Tooltip content="Vertical fretboard — matches how you see the neck while playing" position="bottom">
-                            <button
-                              onClick={() => setScaleLayout('vertical')}
-                              className={clsx(
-                                "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
-                                scaleLayout === 'vertical'
-                                  ? "bg-violet-500 text-white"
-                                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              )}
-                            >
-                              Vertical
-                            </button>
-                          </Tooltip>
-                        </div>
+                            <Tooltip content="Horizontal fretboard — great for seeing the full neck at once" position="bottom">
+                              <button
+                                onClick={() => setScaleLayout('horizontal')}
+                                className={clsx(
+                                  "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
+                                  scaleLayout === 'horizontal'
+                                    ? "bg-violet-500 text-white"
+                                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                )}
+                              >
+                                Horizontal
+                              </button>
+                            </Tooltip>
+                            <Tooltip content="Vertical fretboard — matches how you see the neck while playing" position="bottom">
+                              <button
+                                onClick={() => setScaleLayout('vertical')}
+                                className={clsx(
+                                  "px-3 py-1.5 text-xs font-semibold rounded transition-colors",
+                                  scaleLayout === 'vertical'
+                                    ? "bg-violet-500 text-white"
+                                    : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                )}
+                              >
+                                Vertical
+                              </button>
+                            </Tooltip>
+                          </div>
                       </div>
                     </>
                   )}
@@ -1175,7 +1143,7 @@ export default function App() {
         </div>
 
         {/* FRETBOARD AREA */}
-        <section className="relative">
+        <section className={clsx("relative", mode === 'Scale' && 'lg:hidden')}>
            {/* Color Legend (Mobile Overlay or Top Strip) - only for Scale and Chord modes */}
            {!isScaleAllNotesView && mode !== 'Triads' && (
              <div className="flex gap-4 mb-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
@@ -1214,7 +1182,6 @@ export default function App() {
                  onStringFilterChange={isScaleAllNotesView ? setAllNotesStringFilter : undefined}
                  activeNoteFilter={isScaleAllNotesView ? allNotesNoteFilter : undefined}
                  onNoteFilterChange={isScaleAllNotesView ? setAllNotesNoteFilter : undefined}
-                 sequenceNotes={activeRun ?? undefined}
                />
              ) : (
                <Fretboard
@@ -1229,7 +1196,6 @@ export default function App() {
                   onStringFilterChange={setAllNotesStringFilter}
                   activeNoteFilter={allNotesNoteFilter}
                   onNoteFilterChange={setAllNotesNoteFilter}
-                  onExportRef={setFretboardRef}
                />
              )
            ) : mode === 'Chord' ? (
@@ -1252,7 +1218,7 @@ export default function App() {
         </section>
 
         {/* BOTTOM SECTION */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
+        <div className={clsx("grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12", mode === 'Scale' && 'lg:hidden')}>
             
             {/* Left: Info + Key Chords */}
             <div className="space-y-6">
@@ -1323,20 +1289,325 @@ export default function App() {
               )}
             </div>
 
-            {/* Right: Neck Runs (only for Scale pattern mode) */}
-            {mode === 'Scale' && scaleView === 'pattern' && (
-              <div>
-                <TabGenerator
-                    root={root}
-                    scaleType={scaleType}
-                    position={position}
-                    activeRun={activeRun}
-                    onRunGenerated={setActiveRun}
-                    onClearRun={() => setActiveRun(null)}
-                />
-              </div>
-            )}
         </div>
+
+        {/* ── SCALE MODE: lg+ sidebar layout ── */}
+        {mode === 'Scale' && (
+          <div className="hidden lg:flex items-start gap-0">
+
+            {/* SIDEBAR */}
+            <aside className="w-64 shrink-0 sticky top-[148px] self-start overflow-y-auto max-h-[calc(100vh-160px)] bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 rounded-xl flex flex-col p-4 space-y-5">
+
+              {/* Available Views */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Available Views</label>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex bg-slate-100 dark:bg-slate-900 rounded-md p-0.5 w-fit">
+                      <button onClick={() => setScaleView('pattern')} className={clsx("px-3 py-1.5 text-xs font-semibold rounded transition-colors", scaleView === 'pattern' ? "bg-violet-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700")}>Scale Pattern</button>
+                      <button onClick={() => setScaleView('allNotes')} className={clsx("px-3 py-1.5 text-xs font-semibold rounded transition-colors", scaleView === 'allNotes' ? "bg-violet-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700")}>All Notes</button>
+                    </div>
+                    {scaleView === 'allNotes' && (
+                      <Tooltip content="Tip: click a string label (6th, 5th…) on the fretboard to filter notes to just that string. Click again to show all strings." position="bottom">
+                        <span className="inline-flex items-center gap-1 text-xs text-violet-500 cursor-default select-none">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                          Filter by string
+                        </span>
+                      </Tooltip>
+                    )}
+                  </div>
+                  <div className="inline-flex bg-slate-100 dark:bg-slate-900 rounded-md p-0.5 w-fit">
+                      <Tooltip content="Horizontal fretboard — great for seeing the full neck at once" position="bottom">
+                        <button onClick={() => setScaleLayout('horizontal')} className={clsx("px-3 py-1.5 text-xs font-semibold rounded transition-colors", scaleLayout === 'horizontal' ? "bg-violet-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700")}>Horizontal</button>
+                      </Tooltip>
+                      <Tooltip content="Vertical fretboard — matches how you see the neck while playing" position="bottom">
+                        <button onClick={() => setScaleLayout('vertical')} className={clsx("px-3 py-1.5 text-xs font-semibold rounded transition-colors", scaleLayout === 'vertical' ? "bg-violet-500 text-white" : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700")}>Vertical</button>
+                      </Tooltip>
+                    </div>
+                </div>
+              </div>
+
+              {/* Root */}
+              {!isScaleAllNotesView && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Root</label>
+                  <div className="relative">
+                    <select value={root} onChange={(e) => setRoot(e.target.value as NoteName)} className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-2.5 px-4 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none font-medium">
+                      {NOTES.map(note => <option key={note} value={note}>{note}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+
+              {/* Scale Type */}
+              {!isScaleAllNotesView && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Scale Type</label>
+                  <div className="relative">
+                    <select value={scaleType} onChange={(e) => setScaleType(e.target.value as ScaleType)} className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-2.5 px-4 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none font-medium">
+                      {Object.values(ScaleType).map(st => <option key={st} value={st}>{st}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+
+              {/* Position */}
+              {scaleView === 'pattern' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    Position <span className="text-violet-500 ml-2 font-normal normal-case">{positionLabel}</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {(['Full Neck', 1, 2, 3, 4, 5] as const).map(p => (
+                      <button key={p} onClick={() => setPosition(p)} className={clsx("flex-1 py-1.5 px-2 rounded-md text-xs font-medium transition-all whitespace-nowrap", position === p ? "bg-violet-500 text-white shadow-sm" : "bg-slate-100 dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200")}>
+                        {p === 'Full Neck' ? 'All' : p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Neck Width */}
+              {scaleView === 'allNotes' && scaleLayout === 'horizontal' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    Neck Width <span className="text-violet-500 ml-2 font-normal normal-case">{Math.round(allNotesZoom * 100)}%</span>
+                  </label>
+                  <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-lg w-fit">
+                    <button onClick={() => setAllNotesZoom((prev) => Math.max(1, Math.round((prev - 0.1) * 100) / 100))} className="px-3 py-2 rounded-md text-sm font-bold bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors" title="Decrease neck width">-</button>
+                    <button onClick={() => setAllNotesZoom((prev) => Math.min(2.2, Math.round((prev + 0.1) * 100) / 100))} className="px-3 py-2 rounded-md text-sm font-bold bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors" title="Increase neck width">+</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Display Toggles */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Display</label>
+                <div className="flex gap-2 flex-wrap">
+                  <Tooltip content="Show or hide note names (A, B, C…) on each dot" position="bottom">
+                    <button onClick={() => setSettings(s => ({ ...s, showNoteNames: !s.showNoteNames }))} className={clsx("p-2.5 rounded-lg border transition-colors", settings.showNoteNames ? "bg-violet-100 dark:bg-violet-900/30 border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300" : "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400")}>
+                      <span className="font-bold text-xs">Notes</span>
+                    </button>
+                  </Tooltip>
+                  {scaleView === 'pattern' && (
+                    <Tooltip content="Draw lines connecting adjacent scale positions so you can see how they overlap and link across the neck" position="bottom">
+                      <button onClick={() => setSettings(s => ({ ...s, showConnections: !s.showConnections }))} className={clsx("p-2.5 rounded-lg border transition-colors", settings.showConnections ? "bg-violet-100 dark:bg-violet-900/30 border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300" : "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400")}>
+                        <span className="font-bold text-xs">CONN</span>
+                      </button>
+                    </Tooltip>
+                  )}
+                  {scaleView === 'pattern' && (
+                    <Tooltip content="Show the diatonic chords that naturally fit in this key — useful for knowing what chords to play over a scale" position="bottom">
+                      <button onClick={() => setShowScaleDegreeHelper(prev => !prev)} className={clsx("p-2.5 rounded-lg border transition-colors", showScaleDegreeHelper ? "bg-violet-100 dark:bg-violet-900/30 border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300" : "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400")}>
+                        <span className="font-bold text-xs">KEY</span>
+                      </button>
+                    </Tooltip>
+                  )}
+                </div>
+              </div>
+
+              {/* Practice Tools */}
+              {scaleView === 'pattern' && (
+                <div className="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-3">
+                  <h4 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Practice Tools</h4>
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <Timer size={14} /> BPM
+                    </label>
+                    <input type="range" min={50} max={200} value={bpm} onChange={(e) => setBpm(Number(e.target.value))} className="w-full" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{bpm} BPM</span>
+                      <button onClick={() => { setMetronomeBlocked(false); setMetronomeOn((prev) => !prev); }} className={clsx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold transition-colors", metronomeOn ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800")}>
+                        {metronomeOn ? <Pause size={14} /> : <Play size={14} />}
+                        {metronomeOn ? 'Stop' : 'Start'}
+                      </button>
+                    </div>
+                    {metronomeBlocked && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">Audio blocked — tap anywhere first.</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </aside>
+
+            {/* RIGHT AREA */}
+            <div className="flex-1 min-w-0 pl-6 flex flex-row gap-6 items-start">
+
+              {/* Fretboard column */}
+              <div className="flex-1 flex flex-col items-center gap-4 min-w-0">
+
+                {/* Color Legend */}
+                {!isScaleAllNotesView && (
+                  <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                    {[1,2,3,4,5].map(p => (
+                      <div key={p} className="flex items-center gap-1.5 min-w-max">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: POSITION_COLORS[p as 1|2|3|4|5] }}></div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">Pos {p} ({POSITION_NAMES[p as 1|2|3|4|5]})</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* All Notes hint */}
+                {isScaleAllNotesView && (
+                  <div className="flex items-center justify-center gap-4 text-xs text-slate-400 dark:text-slate-500 py-1 select-none">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-full bg-slate-400/50 dark:bg-slate-500/50" />
+                      Click a <strong className="text-slate-500 dark:text-slate-400">note dot</strong> to filter by that note
+                    </span>
+                    <span className="text-slate-300 dark:text-slate-600">|</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block text-[10px] font-bold border border-slate-400/50 rounded px-1 text-slate-400">6th</span>
+                      Click a <strong className="text-slate-500 dark:text-slate-400">string label</strong> to isolate that string
+                    </span>
+                  </div>
+                )}
+
+                {/* Fretboard */}
+                {scaleLayout === 'vertical' ? (
+                  <div className="flex justify-center w-full">
+                    <VerticalScaleFretboard
+                      root={root}
+                      scaleType={scaleType}
+                      position={effectiveScalePosition}
+                      settings={settings}
+                      showAllNotes={isScaleAllNotesView}
+                      activeStringFilter={isScaleAllNotesView ? allNotesStringFilter : undefined}
+                      onStringFilterChange={isScaleAllNotesView ? setAllNotesStringFilter : undefined}
+                      activeNoteFilter={isScaleAllNotesView ? allNotesNoteFilter : undefined}
+                      onNoteFilterChange={isScaleAllNotesView ? setAllNotesNoteFilter : undefined}
+                    />
+                  </div>
+                ) : (
+                  <Fretboard
+                    root={root}
+                    type={scaleType}
+                    mode={mode}
+                    position={effectiveScalePosition}
+                    settings={settings}
+                    showAllNotes={isScaleAllNotesView}
+                    allNotesZoom={allNotesZoom}
+                    activeStringFilter={allNotesStringFilter}
+                    onStringFilterChange={setAllNotesStringFilter}
+                    activeNoteFilter={allNotesNoteFilter}
+                    onNoteFilterChange={setAllNotesNoteFilter}
+                  />
+                )}
+
+                {/* Panels below fretboard — visible on lg, hidden on xl (shown in sticky column instead) */}
+                <div className="xl:hidden flex flex-col gap-4 w-full">
+
+                  {/* Scale Info accordion */}
+                  <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <button onClick={() => setIsInfoExpanded(!isInfoExpanded)} className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                      <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+                        <Info size={20} className="text-violet-500" />
+                        Scale Info
+                      </h3>
+                      {isInfoExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </button>
+                    {isInfoExpanded && (
+                      <div className="p-5 space-y-4">
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Intervals</h4>
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {currentDefinition.intervals.map((int, i) => (
+                              <span key={i} className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-sm font-mono text-slate-700 dark:text-slate-300">{int === 0 ? 'R' : int}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Description</h4>
+                          <p className="mt-1 text-slate-700 dark:text-slate-300 leading-relaxed">{currentDefinition.description}</p>
+                        </div>
+                        <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 p-4 rounded-lg">
+                          <h4 className="text-sm font-bold text-violet-700 dark:text-violet-300 mb-1">Pro Tip 💡</h4>
+                          <p className="text-sm text-violet-600 dark:text-violet-400 italic">{currentDefinition.tip}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chords for a Key */}
+                  {scaleView === 'pattern' && showScaleDegreeHelper && (
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+                      <h3 className="font-bold text-lg text-slate-800 dark:text-white">Chords for a Key</h3>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{root} {scaleType}: {selectedScaleNotes.join(' ')}</p>
+                      {selectedScaleDegreeChords ? (
+                        <div className="mt-4 space-y-1.5 text-slate-800 dark:text-slate-100 font-medium">
+                          {selectedScaleDegreeChords.map(({ degree, note, shortQuality }) => (
+                            <p key={degree}>{degree} - {note}{shortQuality ? ` ${shortQuality}` : ''}{scaleType === ScaleType.MAJOR && degree === 6 ? ' (relative minor)' : ''}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Degree chords are shown for 7-note scales (Major, Natural Minor, Dorian, Mixolydian, Harmonic Minor).</p>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
+              {/* Sticky panels column — xl+ only */}
+              <div className="hidden xl:flex flex-col gap-4 w-72 shrink-0 sticky top-[148px] self-start max-h-[calc(100vh-160px)] overflow-y-auto">
+
+                {/* Scale Info accordion */}
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <button onClick={() => setIsInfoExpanded(!isInfoExpanded)} className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+                      <Info size={20} className="text-violet-500" />
+                      Scale Info
+                    </h3>
+                    {isInfoExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+                  {isInfoExpanded && (
+                    <div className="p-5 space-y-4">
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Intervals</h4>
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {currentDefinition.intervals.map((int, i) => (
+                            <span key={i} className="px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded text-sm font-mono text-slate-700 dark:text-slate-300">{int === 0 ? 'R' : int}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Description</h4>
+                        <p className="mt-1 text-slate-700 dark:text-slate-300 leading-relaxed">{currentDefinition.description}</p>
+                      </div>
+                      <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800 p-4 rounded-lg">
+                        <h4 className="text-sm font-bold text-violet-700 dark:text-violet-300 mb-1">Pro Tip 💡</h4>
+                        <p className="text-sm text-violet-600 dark:text-violet-400 italic">{currentDefinition.tip}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chords for a Key */}
+                {scaleView === 'pattern' && showScaleDegreeHelper && (
+                  <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+                    <h3 className="font-bold text-lg text-slate-800 dark:text-white">Chords for a Key</h3>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{root} {scaleType}: {selectedScaleNotes.join(' ')}</p>
+                    {selectedScaleDegreeChords ? (
+                      <div className="mt-4 space-y-1.5 text-slate-800 dark:text-slate-100 font-medium">
+                        {selectedScaleDegreeChords.map(({ degree, note, shortQuality }) => (
+                          <p key={degree}>{degree} - {note}{shortQuality ? ` ${shortQuality}` : ''}{scaleType === ScaleType.MAJOR && degree === 6 ? ' (relative minor)' : ''}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Degree chords are shown for 7-note scales (Major, Natural Minor, Dorian, Mixolydian, Harmonic Minor).</p>
+                    )}
+                  </div>
+                )}
+
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </main>
 
       <footer className="py-5 border-t border-slate-200 dark:border-slate-800 mt-auto">
