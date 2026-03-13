@@ -183,13 +183,19 @@ function AboutTab() {
 
       <div className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed space-y-3">
         <p>
-          I'm a self-taught guitarist who finally got serious about learning theory and actually knowing my way around the fretboard — so I built NeckNinja.
+          I'm not a NeckNinja yet...more like a NeckNoodler. I'm a self-taught guitarist who finally got serious about learning some theory, chords, and CAGED shapes (and hoping to find a teacher).
         </p>
         <p>
-          Started it just for myself, then figured there were probably others out there like me: beginner to intermediate players who've burned through more YouTube, TikTok, and Instagram videos than they can count, still trying to connect the dots. That was me.
+          I'm not a developer — the NeckNinja app was mostly built with Claude Code — but I designed screens based on views of the fretboard that actually helped me learn.
         </p>
         <p>
-          It's free. But if it helps you out, I won't say no to a coffee now and then — keeps me motivated to keep building! Keep playing you've got this!
+          I built it for myself at first, then figured there were probably others like me: beginner to intermediate players who've burned through more YouTube, TikTok, and Instagram videos than they can count, still trying to connect the dots. That was/is me.
+        </p>
+        <p>
+          NeckNinja is free. But if it helps you out, I won't say no to a coffee now or just drop me a line to tell me how its going. 
+        </p>
+        <p>
+          I'm a hobbyist player who loves family, learning, music, guitar and building apps in my spare time. Enough reading — go play!
         </p>
       </div>
 

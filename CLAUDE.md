@@ -18,7 +18,7 @@ components/
   VerticalChordChart.tsx  # Vertical fretboard for chord voicings
   TriadFretboard.tsx      # Vertical fretboard for triad visualization
   TriadChart.tsx          # Mini voicing diagrams for triads
-  TabGenerator.tsx        # Neck Runs panel (generates RunNote[] sequences overlaid on fretboard)
+  TabGenerator.tsx        # Neck Runs panel (on disk but not rendered in app)
   Tooltip.tsx             # Portal-based tooltip component (hover/focus triggered)
   WelcomeModal.tsx        # Onboarding modal — tabs: Overview, Scales, Chords, Practice, About
 constants.ts         # Note definitions, scales, chords, tuning data
@@ -39,7 +39,6 @@ utils/
   - Hint banner above fretboard explaining click-to-filter interactions
 - **Available Views layout**: `flex-col` — H/V layout toggle always on row below view toggle
 - **Note dot sizes**: standardized to 32px (non-root) / 36px (root) across all fretboards
-- **Neck Runs** (TabGenerator): generates Box / Diagonal / Full Neck run sequences shown as amber numbered badges on the vertical scale fretboard
 - **ABC button**: Toggles note name display (A, B, C, etc.)
 - **R35 button** (Triads mode): Toggles interval labels (R, 3, 5)
 - **Position selector** (Scale Pattern view): Filter by CAGED position (default: `'Full Neck'`)
@@ -50,6 +49,8 @@ utils/
 - **About tab** in WelcomeModal: Creator bio (James Build) + Buy Me a Coffee link
 - **Footer**: "Created by James Build · ☕ About" — About opens WelcomeModal to About tab
 - **Tooltip**: Wraps any element; renders via React portal to `document.body`
+- **Chord display controls** (lg+ top bar, right side): Notes toggle · Shape/All Tones segmented toggle (`chordNoteDisplayMode`) · Core/Full CAGED segmented toggle (`chordCagedScope`) · More Tools (BPM, metronome, play progression, share link)
+- **Chord lg+ layout**: two-part — TOP BAR (presets, key, display toggles, More Tools) + MAIN AREA (VerticalChordChart); no sidebar or bottom bar; chord slot editing is mobile-only
 - **State persistence**: URL query params restore current mode/settings/chords when the same URL is reopened; includes `scaleLayout` param
 
 ## Running the App
@@ -79,4 +80,4 @@ When both ABC and R35 are on, ABC (note names) takes priority over R35 (interval
 
 ### Key localStorage Keys
 - `nn_welcomed` — WelcomeModal dismissed state
-- `nn_email_captured` — Neck Runs PNG download email gate
+- `nn_email_captured` — legacy Neck Runs download gate (TabGenerator on disk, not rendered)

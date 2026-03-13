@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle, Link2, Play, Pause, Timer, HelpCircle, Coffee } from 'lucide-react';
 import clsx from 'clsx';
 import Fretboard from './components/Fretboard';
@@ -8,8 +8,8 @@ import TriadFretboard from './components/TriadFretboard';
 import Tooltip from './components/Tooltip';
 import WelcomeModal from './components/WelcomeModal';
 import { NOTES, SCALES, CHORDS, POSITION_NAMES, POSITION_COLORS } from './constants';
-import { NoteName, ScaleType, ChordType, Position, Settings, Mode, TriadQuality, StringGroup, KeyMode } from './types';
-import { getScaleNotes, getScaleDegreeChords, getProgressionScaleSuggestions } from './utils/musicLogic';
+import { NoteName, ScaleType, ChordType, Position, Settings, Mode, TriadQuality, StringGroup } from './types';
+import { getScaleNotes, getScaleDegreeChords } from './utils/musicLogic';
 
 interface SelectedChord {
   id: number;
@@ -40,7 +40,6 @@ type ChordCagedScope = 'core' | 'full';
 
 
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11] as const;
-const NATURAL_MINOR_INTERVALS = [0, 2, 3, 5, 7, 8, 10] as const;
 
 const MAJOR_DIATONIC_TRIAD_QUALITIES: ChordType[] = [
   ChordType.MAJOR,
@@ -52,16 +51,6 @@ const MAJOR_DIATONIC_TRIAD_QUALITIES: ChordType[] = [
   ChordType.DIMINISHED,
 ];
 
-const MINOR_DIATONIC_TRIAD_QUALITIES: ChordType[] = [
-  ChordType.MINOR,
-  ChordType.DIMINISHED,
-  ChordType.MAJOR,
-  ChordType.MINOR,
-  ChordType.MINOR,
-  ChordType.MAJOR,
-  ChordType.MAJOR,
-];
-
 const MAJOR_CHORD_PROGRESSIONS: ProgressionPreset[] = [
   { id: 'one-five-six-four', label: 'I-V-vi-IV', degrees: [{ degree: 1 }, { degree: 5 }, { degree: 6 }, { degree: 4 }] },
   { id: 'one-four-five', label: 'I-IV-V', degrees: [{ degree: 1 }, { degree: 4 }, { degree: 5 }] },
@@ -70,13 +59,6 @@ const MAJOR_CHORD_PROGRESSIONS: ProgressionPreset[] = [
   { id: 'one-six-two-five', label: 'I-vi-ii-V', degrees: [{ degree: 1 }, { degree: 6 }, { degree: 2 }, { degree: 5, forceType: ChordType.DOMINANT_7 }] },
 ];
 
-const MINOR_CHORD_PROGRESSIONS: ProgressionPreset[] = [
-  { id: 'one-four-five-minor', label: 'i-iv-v', degrees: [{ degree: 1 }, { degree: 4 }, { degree: 5 }] },
-  { id: 'one-six-three-seven', label: 'i-VI-III-VII', degrees: [{ degree: 1 }, { degree: 6 }, { degree: 3 }, { degree: 7 }] },
-  { id: 'two-dim-five-one', label: 'iio-v-i', degrees: [{ degree: 2 }, { degree: 5 }, { degree: 1 }] },
-  { id: 'one-five-six-four-minor', label: 'i-v-VI-iv', degrees: [{ degree: 1 }, { degree: 5 }, { degree: 6 }, { degree: 4 }] },
-  { id: 'one-seven-six-seven', label: 'i-VII-VI-VII', degrees: [{ degree: 1 }, { degree: 7 }, { degree: 6 }, { degree: 7 }] },
-];
 
 const isNoteName = (value: string | null): value is NoteName => {
   return !!value && NOTES.includes(value as NoteName);
@@ -107,9 +89,10 @@ export default function App() {
   const [root, setRoot] = useState<NoteName>('A');
   const [scaleType, setScaleType] = useState<ScaleType>(ScaleType.MINOR_PENTATONIC);
   const [selectedChords, setSelectedChords] = useState<SelectedChord[]>([
-    { id: 1, root: 'C#', chordType: ChordType.MINOR },
-    { id: 2, root: 'A', chordType: ChordType.MAJOR },
-    { id: 3, root: 'E', chordType: ChordType.MAJOR },
+    { id: 1, root: 'A', chordType: ChordType.MAJOR },
+    { id: 2, root: 'E', chordType: ChordType.MAJOR },
+    { id: 3, root: 'F#', chordType: ChordType.MINOR },
+    { id: 4, root: 'D', chordType: ChordType.MAJOR },
   ]);
   const [chordNoteDisplayMode, setChordNoteDisplayMode] = useState<ChordNoteDisplayMode>('shape');
   const [chordCagedScope, setChordCagedScope] = useState<ChordCagedScope>('core');
@@ -129,8 +112,7 @@ export default function App() {
   const [allNotesStringFilter, setAllNotesStringFilter] = useState<number | null>(null);
   const [allNotesNoteFilter, setAllNotesNoteFilter] = useState<NoteName | null>(null);
   const [progressionKey, setProgressionKey] = useState<NoteName>('A');
-  const [progressionMode, setProgressionMode] = useState<KeyMode>('Major');
-  const [activeProgressionPresetId, setActiveProgressionPresetId] = useState<string | null>(null);
+  const [activeProgressionPresetId, setActiveProgressionPresetId] = useState<string | null>('one-five-six-four');
   const [bpm, setBpm] = useState(90);
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [metronomeBlocked, setMetronomeBlocked] = useState(false);
@@ -141,6 +123,7 @@ export default function App() {
     try { return localStorage.getItem('nn_welcomed') !== '1'; } catch { return true; }
   });
   const [welcomeInitialTab, setWelcomeInitialTab] = useState<'overview' | 'scales' | 'chords' | 'practice' | 'about'>('overview');
+  const [isChordToolsExpanded, setIsChordToolsExpanded] = useState(false);
 
   const closeWelcome = () => {
     setShowWelcome(false);
@@ -149,6 +132,7 @@ export default function App() {
 
   const hasLoadedFromUrlRef = React.useRef(false);
   const audioContextRef = React.useRef<AudioContext | null>(null);
+  const bottomScrollRef = React.useRef<HTMLDivElement>(null);
   const metronomeTimerRef = React.useRef<number | null>(null);
   const progressionTimerRef = React.useRef<number | null>(null);
   const metronomeBeatRef = React.useRef(0);
@@ -191,7 +175,6 @@ export default function App() {
     const allNotesZoomParam = params.get('allNotesZoom');
     const positionParam = params.get('position');
     const progressionKeyParam = params.get('progressionKey');
-    const progressionModeParam = params.get('progressionMode');
 
     const presetParam = params.get('preset');
     const bpmParam = params.get('bpm');
@@ -229,8 +212,8 @@ export default function App() {
     }
 
     if (isNoteName(progressionKeyParam)) setProgressionKey(progressionKeyParam);
-    if (progressionModeParam === 'Major' || progressionModeParam === 'Minor') setProgressionMode(progressionModeParam);
-    if (presetParam) setActiveProgressionPresetId(presetParam);
+    const VALID_PRESET_IDS = MAJOR_CHORD_PROGRESSIONS.map(p => p.id);
+    if (presetParam && VALID_PRESET_IDS.includes(presetParam)) setActiveProgressionPresetId(presetParam);
     if (bpmParam) {
       const parsedBpm = Number(bpmParam);
       if (!Number.isNaN(parsedBpm) && parsedBpm >= 50 && parsedBpm <= 200) setBpm(parsedBpm);
@@ -265,7 +248,6 @@ export default function App() {
     params.set('allNotesZoom', allNotesZoom.toFixed(2));
     params.set('position', String(position));
     params.set('progressionKey', progressionKey);
-    params.set('progressionMode', progressionMode);
     params.set('triad', triadQuality);
     params.set('chordNoteMode', chordNoteDisplayMode);
     params.set('cagedScope', chordCagedScope);
@@ -289,7 +271,6 @@ export default function App() {
     allNotesZoom,
     position,
     progressionKey,
-    progressionMode,
     triadQuality,
     chordNoteDisplayMode,
     chordCagedScope,
@@ -328,17 +309,8 @@ export default function App() {
     : `${POSITION_NAMES[position]} (${position})`;
   const selectedScaleNotes = getScaleNotes(root, scaleType);
   const selectedScaleDegreeChords = getScaleDegreeChords(root, scaleType);
-  const activeProgressions = progressionMode === 'Major' ? MAJOR_CHORD_PROGRESSIONS : MINOR_CHORD_PROGRESSIONS;
+  const activeProgressions = MAJOR_CHORD_PROGRESSIONS;
   const activeProgressionPreset = activeProgressions.find((preset) => preset.id === activeProgressionPresetId) ?? null;
-  const progressionSuggestions = useMemo(
-    () =>
-      getProgressionScaleSuggestions(
-        progressionKey,
-        selectedChords.map((chord) => ({ root: chord.root, chordType: chord.chordType })),
-        progressionMode
-      ),
-    [progressionKey, selectedChords, progressionMode]
-  );
   const activePracticeChordId = activePracticeChordIndex !== null ? selectedChords[activePracticeChordIndex]?.id ?? null : null;
 
   const getAudioContext = () => {
@@ -449,11 +421,10 @@ export default function App() {
     setSelectedChords(prev => (prev.length > 1 ? prev.filter(chord => chord.id !== id) : prev));
   };
 
-  const applyProgressionPreset = (preset: ProgressionPreset) => {
-    const scaleIntervals = progressionMode === 'Major' ? MAJOR_SCALE_INTERVALS : NATURAL_MINOR_INTERVALS;
-    const diatonicQualities =
-      progressionMode === 'Major' ? MAJOR_DIATONIC_TRIAD_QUALITIES : MINOR_DIATONIC_TRIAD_QUALITIES;
-    const keyIndex = NOTES.indexOf(progressionKey);
+  const applyProgressionPreset = (preset: ProgressionPreset, forKey?: NoteName) => {
+    const scaleIntervals = MAJOR_SCALE_INTERVALS;
+    const diatonicQualities = MAJOR_DIATONIC_TRIAD_QUALITIES;
+    const keyIndex = NOTES.indexOf(forKey ?? progressionKey);
     const nextChords: SelectedChord[] = preset.degrees.slice(0, 5).map((degreeData, index) => {
       const scaleInterval = scaleIntervals[degreeData.degree - 1];
       const rootNote = NOTES[(keyIndex + scaleInterval) % 12];
@@ -565,7 +536,7 @@ export default function App() {
       <main className="flex-1 max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-6">
         
         {/* CONTROL PANEL */}
-        <div className={clsx("bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 space-y-6", mode === 'Scale' && 'lg:hidden')}>
+        <div className={clsx("bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 md:p-6 space-y-6", (mode === 'Scale' || mode === 'Chord') && 'lg:hidden')}>
           
           <div className="flex flex-col lg:flex-row gap-6 lg:items-end">
             
@@ -577,39 +548,27 @@ export default function App() {
                   Chords (up to 5)
                 </label>
 
-                <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-3 items-start">
+                <div className="block">
                   <div className="space-y-3">
                     <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                         <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                           Progression Presets
                         </label>
-                        <div className="inline-flex bg-slate-100 dark:bg-slate-800 rounded-md p-0.5">
-                          {(['Major', 'Minor'] as const).map((keyMode) => (
-                            <button
-                              key={keyMode}
-                              onClick={() => {
-                                setProgressionMode(keyMode);
-                                setActiveProgressionPresetId(null);
-                              }}
-                              className={clsx(
-                                "px-2.5 py-1 text-[11px] font-semibold rounded transition-colors",
-                                progressionMode === keyMode
-                                  ? "bg-violet-500 text-white"
-                                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                              )}
-                            >
-                              {keyMode}
-                            </button>
-                          ))}
-                        </div>
                         <div className="relative w-[130px]">
                           <select
                             value={progressionKey}
-                            onChange={(e) => setProgressionKey(e.target.value as NoteName)}
+                            onChange={(e) => {
+                              const newKey = e.target.value as NoteName;
+                              setProgressionKey(newKey);
+                              if (activeProgressionPresetId) {
+                                const preset = activeProgressions.find(p => p.id === activeProgressionPresetId);
+                                if (preset) applyProgressionPreset(preset, newKey);
+                              }
+                            }}
                             className="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-1.5 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-medium"
                           >
-                            {NOTES.map(note => <option key={note} value={note}>{note} {progressionMode.toLowerCase()}</option>)}
+                            {NOTES.map(note => <option key={note} value={note}>{note} major</option>)}
                           </select>
                           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                         </div>
@@ -626,7 +585,7 @@ export default function App() {
                                 ? "border-violet-500 bg-violet-500 text-white"
                                 : "border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
                             )}
-                            title={`Apply ${preset.label} in ${progressionKey} ${progressionMode.toLowerCase()}`}
+                            title={`Apply ${preset.label} in ${progressionKey} major`}
                           >
                             {preset.label}
                           </button>
@@ -753,51 +712,6 @@ export default function App() {
                           + Add Chord
                         </button>
                       )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-violet-200/70 dark:border-violet-800 bg-white/80 dark:bg-slate-900/70 p-3 xl:max-h-[430px] xl:overflow-y-auto custom-scrollbar">
-                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">Solo Scale Suggestions</h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      {progressionKey} {progressionMode.toLowerCase()} {activeProgressionPreset ? `- ${activeProgressionPreset.label}` : '- Custom progression'}
-                    </p>
-
-                    <div className="mt-3 space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Global</p>
-                      {progressionSuggestions.global.map((suggestion) => (
-                        <div key={suggestion.name} className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">{suggestion.name}</span>
-                            <span
-                              className={clsx(
-                                "text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide font-bold",
-                                suggestion.priority === 'primary'
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                  : "bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-                              )}
-                            >
-                              {suggestion.priority}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-snug">{suggestion.why}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="mt-3 space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Target by Chord</p>
-                      {progressionSuggestions.perChord.map((entry) => (
-                        <div key={entry.chordLabel} className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-2">
-                          <p className="text-xs font-semibold text-violet-700 dark:text-violet-300">{entry.chordLabel}</p>
-                          <div className="mt-1.5 space-y-1">
-                            {entry.scales.map((suggestion) => (
-                              <p key={`${entry.chordLabel}-${suggestion.name}`} className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
-                                <span className="font-semibold">{suggestion.name}:</span> {suggestion.why}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   </div>
                 </div>
@@ -1143,7 +1057,7 @@ export default function App() {
         </div>
 
         {/* FRETBOARD AREA */}
-        <section className={clsx("relative", mode === 'Scale' && 'lg:hidden')}>
+        <section className={clsx("relative", (mode === 'Scale' || mode === 'Chord') && 'lg:hidden')}>
            {/* Color Legend (Mobile Overlay or Top Strip) - only for Scale and Chord modes */}
            {!isScaleAllNotesView && mode !== 'Triads' && (
              <div className="flex gap-4 mb-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
@@ -1218,7 +1132,7 @@ export default function App() {
         </section>
 
         {/* BOTTOM SECTION */}
-        <div className={clsx("grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12", mode === 'Scale' && 'lg:hidden')}>
+        <div className={clsx("grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12", (mode === 'Scale' || mode === 'Chord') && 'lg:hidden')}>
             
             {/* Left: Info + Key Chords */}
             <div className="space-y-6">
@@ -1605,6 +1519,214 @@ export default function App() {
               </div>
 
             </div>
+          </div>
+        )}
+
+        {/* ── CHORD MODE: lg+ layout ── */}
+        {mode === 'Chord' && (
+          <div className="hidden lg:flex flex-col gap-4">
+
+            {/* TOP BAR */}
+            <div className="relative bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex items-center gap-3 flex-wrap">
+
+                {/* Preset buttons */}
+                <div className="flex flex-wrap gap-1.5">
+                  {MAJOR_CHORD_PROGRESSIONS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => applyProgressionPreset(preset)}
+                      className={clsx(
+                        "px-3 py-1.5 rounded-md text-xs font-semibold border transition-colors",
+                        activeProgressionPresetId === preset.id
+                          ? "border-violet-500 bg-violet-500 text-white"
+                          : "border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20"
+                      )}
+                      title={`Apply ${preset.label} in ${progressionKey} major`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 shrink-0" />
+
+                {/* Key dropdown */}
+                <div className="relative">
+                  <select
+                    value={progressionKey}
+                    onChange={(e) => {
+                      const newKey = e.target.value as NoteName;
+                      setProgressionKey(newKey);
+                      if (activeProgressionPresetId) {
+                        const preset = MAJOR_CHORD_PROGRESSIONS.find(p => p.id === activeProgressionPresetId);
+                        if (preset) applyProgressionPreset(preset, newKey);
+                      }
+                    }}
+                    className="appearance-none bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg py-1.5 px-3 pr-8 focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none text-sm font-semibold"
+                  >
+                    {NOTES.map(note => <option key={note} value={note}>{note} major</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Song reference hint */}
+                {(() => {
+                  const SONG_REFS: Record<string, string> = {
+                    "one-five-six-four:C": "Let It Be · Don't Stop Believin' · No Woman No Cry",
+                    "one-five-six-four:D": "With or Without You · Photograph",
+                    "one-five-six-four:A": "Take Me to Church",
+                    "one-four-five:G": "Sweet Home Alabama · Knockin' on Heaven's Door",
+                    "one-four-five:A": "Wild Thing · La Bamba",
+                    "one-four-five:E": "Johnny B. Goode · Whole Lotta Love",
+                    "two-five-one:C": "Autumn Leaves · Fly Me to the Moon",
+                    "two-five-one:G": "The Girl from Ipanema",
+                    "six-four-one-five:A": "Counting Stars · Despacito",
+                    "six-four-one-five:C": "Africa by Toto",
+                    "six-four-one-five:G": "Someone Like You",
+                    "one-six-two-five:C": "Heart and Soul · Blue Moon",
+                  };
+                  const songs = activeProgressionPresetId ? SONG_REFS[`${activeProgressionPresetId}:${progressionKey}`] : null;
+                  if (!songs) return null;
+                  return (
+                    <Tooltip content={`🎵 Popular songs using these chords: ${songs}`} position="bottom">
+                      <button className="text-slate-400 hover:text-violet-500 transition-colors p-0.5" tabIndex={-1} aria-label="Song examples">
+                        <Info size={14} />
+                      </button>
+                    </Tooltip>
+                  );
+                })()}
+
+                <div className="flex-1" />
+
+                {/* Notes toggle */}
+                <Tooltip content="Show or hide note names (A, B, C…) on each dot" position="bottom">
+                  <button
+                    onClick={() => setSettings(s => ({ ...s, showNoteNames: !s.showNoteNames }))}
+                    className={clsx(
+                      "px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors",
+                      settings.showNoteNames
+                        ? "bg-violet-100 dark:bg-violet-900/30 border-violet-200 dark:border-violet-700 text-violet-700 dark:text-violet-300"
+                        : "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400"
+                    )}
+                  >Notes</button>
+                </Tooltip>
+
+                {/* Shape / All Tones toggle */}
+                <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <Tooltip content="Show only the notes that belong to the specific CAGED chord shape — easier to see the chord voicing clearly" position="bottom">
+                    <button
+                      onClick={() => setChordNoteDisplayMode('shape')}
+                      className={clsx(
+                        "px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors",
+                        chordNoteDisplayMode === 'shape'
+                          ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                    >Shape</button>
+                  </Tooltip>
+                  <Tooltip content="Show every chord tone across the entire neck, not just one shape" position="bottom">
+                    <button
+                      onClick={() => setChordNoteDisplayMode('all')}
+                      className={clsx(
+                        "px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors border-l border-slate-200 dark:border-slate-700",
+                        chordNoteDisplayMode === 'all'
+                          ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                    >All Tones</button>
+                  </Tooltip>
+                </div>
+
+                {/* Core / Full CAGED toggle */}
+                <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <Tooltip content="Show the 3 most common CAGED shapes (A, E, D) — the best starting point for most guitarists" position="bottom">
+                    <button
+                      onClick={() => setChordCagedScope('core')}
+                      className={clsx(
+                        "px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors",
+                        chordCagedScope === 'core'
+                          ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                    >Core</button>
+                  </Tooltip>
+                  <Tooltip content="Show all 5 CAGED shapes across the full neck" position="bottom">
+                    <button
+                      onClick={() => setChordCagedScope('full')}
+                      className={clsx(
+                        "px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors border-l border-slate-200 dark:border-slate-700",
+                        chordCagedScope === 'full'
+                          ? "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+                          : "bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      )}
+                    >Full CAGED</button>
+                  </Tooltip>
+                </div>
+
+                {/* More Tools toggle */}
+                <button
+                  onClick={() => setIsChordToolsExpanded(prev => !prev)}
+                  className={clsx(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
+                    isChordToolsExpanded
+                      ? "bg-violet-100 dark:bg-violet-900/30 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300"
+                      : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                  )}
+                >
+                  More Tools {isChordToolsExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                </button>
+
+              </div>
+
+              {/* More Tools panel */}
+              {isChordToolsExpanded && (
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <Timer size={13} /> BPM
+                    </label>
+                    <input type="range" min={50} max={200} value={bpm} onChange={(e) => setBpm(Number(e.target.value))} className="w-28" />
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100 w-8 text-right">{bpm}</span>
+                  </div>
+                  <button
+                    onClick={() => setMetronomeOn(prev => !prev)}
+                    className={clsx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold transition-colors",
+                      metronomeOn ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800")}
+                  >
+                    {metronomeOn ? <Pause size={13} /> : <Play size={13} />}
+                    {metronomeOn ? 'Stop Metronome' : 'Start Metronome'}
+                  </button>
+                  <button
+                    onClick={() => setPracticePlaying(prev => !prev)}
+                    className={clsx("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold transition-colors",
+                      practicePlaying ? "border-violet-500 bg-violet-500 text-white" : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800")}
+                  >
+                    {practicePlaying ? <Pause size={13} /> : <Play size={13} />}
+                    {practicePlaying ? 'Stop Progression' : 'Play Progression'}
+                  </button>
+                  <button
+                    onClick={copyShareLink}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Link2 size={13} /> {shareCopied ? 'Copied' : 'Share Link'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* MAIN AREA */}
+            <div className="overflow-x-auto" ref={bottomScrollRef}>
+              <VerticalChordChart
+                chords={selectedChords}
+                noteDisplayMode={chordNoteDisplayMode}
+                cagedScope={chordCagedScope}
+                activeChordId={activePracticeChordId}
+                settings={settings}
+              />
+            </div>
+
           </div>
         )}
 

@@ -273,9 +273,11 @@ const generateChordNotes = (
       if (!allowedIntervals.includes(interval)) continue;
 
       const shapeRange = getShapeRangeForFret(fret, shapeRanges);
-      if (!shapeRange) continue;
-      if (noteDisplayMode === 'shape' && !isStringAllowedForShape(stringIdx, shapeRange.label)) continue;
-      const posIndex = shapeRange.pos;
+      if (noteDisplayMode === 'shape') {
+        if (!shapeRange) continue;
+        if (!isStringAllowedForShape(stringIdx, shapeRange.label)) continue;
+      }
+      const posIndex = shapeRange?.pos ?? getPositionIndexForFret(fret, shapeRanges);
 
       notes.push({
         stringIndex: stringIdx,
@@ -286,6 +288,17 @@ const generateChordNotes = (
         positionIndex: posIndex,
       });
     }
+  }
+
+  if (noteDisplayMode === 'shape') {
+    const best = new Map<string, ChordNote>();
+    for (const n of notes) {
+      const shapeRange = getShapeRangeForFret(n.fret, shapeRanges);
+      const key = `${shapeRange?.label ?? ''}:${shapeRange?.minFret ?? 0}:${n.stringIndex}`;
+      const existing = best.get(key);
+      if (!existing || n.fret < existing.fret) best.set(key, n);
+    }
+    return Array.from(best.values());
   }
 
   return notes;
