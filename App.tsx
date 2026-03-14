@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle, Link2, Play, Pause, Timer, HelpCircle, Coffee } from 'lucide-react';
+import { Sun, Moon, Info, ChevronDown, ChevronUp, Music, Layers, Triangle, Link2, Play, Pause, Timer, HelpCircle, Coffee, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import Fretboard from './components/Fretboard';
 import VerticalScaleFretboard from './components/VerticalScaleFretboard';
@@ -332,7 +332,7 @@ export default function App() {
 
       oscillator.type = 'sine';
       oscillator.frequency.value = accent ? 1200 : 880;
-      gainNode.gain.setValueAtTime(accent ? 0.08 : 0.05, now);
+      gainNode.gain.setValueAtTime(accent ? 0.5 : 0.35, now);
       gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
 
       oscillator.connect(gainNode);
@@ -1725,6 +1725,51 @@ export default function App() {
                 activeChordId={activePracticeChordId}
                 settings={settings}
               />
+            </div>
+
+            {/* Helper text */}
+            <p className="text-xs text-slate-400 dark:text-slate-500 px-2 py-1">
+              Pick your own chords — select up to 4 chords below, or use a progression preset above to auto-fill.
+            </p>
+
+            {/* Bottom bar — chord slot editor */}
+            <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2">
+              <div className="flex flex-row gap-3 flex-wrap items-center">
+                {selectedChords.map((chord, index) => (
+                  <div key={chord.id} className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-slate-400">Chord {index + 1}</span>
+                    <select
+                      value={chord.root}
+                      onChange={(e) => updateChordSelection(chord.id, 'root', e.target.value as NoteName)}
+                      className="appearance-none bg-slate-900 border border-slate-600 text-white rounded px-2 py-1 text-sm"
+                    >
+                      {NOTES.map((note) => (
+                        <option key={note} value={note}>{note}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={chord.chordType}
+                      onChange={(e) => updateChordSelection(chord.id, 'chordType', e.target.value as ChordType)}
+                      className="appearance-none bg-slate-900 border border-slate-600 text-white rounded px-2 py-1 text-sm"
+                    >
+                      {Object.values(ChordType).map((ct) => (
+                        <option key={ct} value={ct}>{ct}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => removeChordSelection(chord.id)}
+                      disabled={selectedChords.length === 1}
+                      className="text-slate-400 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed px-1"
+                    ><Trash2 size={14} /></button>
+                  </div>
+                ))}
+                {selectedChords.length < 5 && (
+                  <button
+                    onClick={addChordSelection}
+                    className="border border-dashed border-slate-600 text-slate-400 hover:border-violet-500 hover:text-violet-400 rounded px-3 py-1 text-sm"
+                  >+ Add</button>
+                )}
+              </div>
             </div>
 
           </div>
